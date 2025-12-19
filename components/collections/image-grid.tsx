@@ -1,14 +1,33 @@
 'use client';
 
-import { Image as ImageType } from '@prisma/client';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-// Using a simplified type for the optimized client data
-type ClientImage = ImageType & { keywords: string[], colors: string[] };
+// Helper to safely get keywords as array (handles both string and array)
+function getKeywordsArray(keywords: string | string[] | null | undefined): string[] {
+    if (!keywords) return [];
+    if (Array.isArray(keywords)) return keywords;
+    try {
+        return JSON.parse(keywords);
+    } catch {
+        return [];
+    }
+}
+
+// Using a simplified type for the client data - keywords/colors can be string or array
+type ClientImage = {
+    id: string;
+    humanId: string;
+    storageUrl: string;
+    descriptionLong: string;
+    keywords: string | string[];
+    colors?: string | string[] | null;
+    mood?: string | null;
+    style?: string | null;
+};
 
 export function ImageGrid({ images }: { images: ClientImage[] }) {
     const [selectedImage, setSelectedImage] = useState<ClientImage | null>(null);
@@ -30,7 +49,7 @@ export function ImageGrid({ images }: { images: ClientImage[] }) {
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
                             <p className="text-xs text-white font-mono mb-1">{img.humanId}</p>
                             <div className="flex flex-wrap gap-1">
-                                {img.keywords.slice(0, 2).map(k => (
+                                {getKeywordsArray(img.keywords).slice(0, 2).map((k: string) => (
                                     <span key={k} className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">{k}</span>
                                 ))}
                             </div>
@@ -60,7 +79,7 @@ export function ImageGrid({ images }: { images: ClientImage[] }) {
                                 <div>
                                     <h4 className="font-semibold text-sm mb-1 text-primary">Keywords</h4>
                                     <div className="flex flex-wrap gap-2">
-                                        {selectedImage?.keywords.map(k => (
+                                        {getKeywordsArray(selectedImage?.keywords).map((k: string) => (
                                             <Badge key={k} variant="secondary">{k}</Badge>
                                         ))}
                                     </div>
