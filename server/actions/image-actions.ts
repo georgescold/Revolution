@@ -84,16 +84,17 @@ export async function getUserImages() {
     if (!session?.user?.id) return { error: 'Unauthorized' };
 
     try {
-        const images = await prisma.image.findMany({
+        const imagesRaw = await prisma.image.findMany({
             where: { userId: session.user.id },
-            select: {
-                id: true,
-                humanId: true,
-                descriptionLong: true,
-                storageUrl: true,
-            },
             orderBy: { createdAt: 'desc' }
         });
+
+        // Parse JSON strings to arrays for keywords and colors
+        const images = imagesRaw.map(img => ({
+            ...img,
+            keywords: JSON.parse(img.keywords || '[]') as string[],
+            colors: JSON.parse(img.colors || '[]') as string[],
+        }));
 
         return { success: true, images };
     } catch (e) {
