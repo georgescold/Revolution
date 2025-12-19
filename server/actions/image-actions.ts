@@ -65,7 +65,7 @@ export async function uploadImage(formData: FormData) {
 
             await prisma.image.create({
                 data: {
-                    userId: session.user!.id,
+                    user: { connect: { id: session.user!.id } },
                     humanId,
                     storageUrl: publicUrl,
                     descriptionLong: analysis.description_long || "No description",
