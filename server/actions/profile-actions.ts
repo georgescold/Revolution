@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 
-export const ProfileSchema = z.object({
+const ProfileSchema = z.object({
     tiktokName: z.string().min(1, "Le nom TikTok est requis"),
     tiktokBio: z.string().optional(),
     persona: z.string().optional(),

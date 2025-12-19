@@ -23,68 +23,88 @@
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
+  --animate-glitch: glitch 0.3s cubic-bezier(.25, .46, .45, .94) both infinite;
 }
 
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    --foreground: 0 0% 0%;
+
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card-foreground: 0 0% 0%;
+
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 348 91% 58%;
-    /* TikTok Red */
-    --primary-foreground: 0 0% 98%;
-    --secondary: 180 89% 56%;
-    /* TikTok Cyan */
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
+    --popover-foreground: 0 0% 0%;
+
+    /* Revolution Red */
+    --primary: 348 100% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Revolution Dark */
+    --secondary: 0 0% 10%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 40%;
+
+    --accent: 0 0% 98%;
     --accent-foreground: 0 0% 9%;
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 348 91% 58%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 348 100% 50%;
+
     --radius: 0.5rem;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  .glitch-hover {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s ease;
+  }
+
+  .glitch-hover:hover {
+    transform: scale(1.02);
+    animation: glitch-skew 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both infinite;
+    box-shadow: 2px 2px 0px hsl(var(--secondary)), -2px -2px 0px hsl(var(--primary));
   }
 }
 
-/* Glitch Animation */
-@keyframes glitch {
+@keyframes glitch-skew {
   0% {
-    transform: translate(0);
+    transform: skew(0deg);
   }
 
   20% {
-    transform: translate(-2px, 2px);
+    transform: skew(-2deg);
   }
 
   40% {
-    transform: translate(-2px, -2px);
+    transform: skew(2deg);
   }
 
   60% {
-    transform: translate(2px, 2px);
+    transform: skew(-1deg);
   }
 
   80% {
-    transform: translate(2px, -2px);
+    transform: skew(1deg);
   }
 
   100% {
-    transform: translate(0);
+    transform: skew(0deg);
   }
 }

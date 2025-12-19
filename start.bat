@@ -8,6 +8,10 @@ echo ==========================================
 :: Open browser immediately (it might need a refresh if server is slow to start)
 start "" "http://localhost:3000"
 
+:: Generate Prisma Client (Fix for env vars)
+echo Generation du client Prisma...
+call npx prisma generate
+
 :: Run the development server
 echo Demarrage du serveur...
 npm run dev

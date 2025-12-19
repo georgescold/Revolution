@@ -120,3 +120,43 @@ export async function getUserImages() {
         return { error: 'Failed to fetch images' };
     }
 }
+
+export async function deleteImage(imageId: string, storageUrl: string) {
+    const session = await auth();
+    if (!session?.user?.id) return { error: 'Unauthorized' };
+
+    try {
+        // 1. Verify ownership
+        const image = await prisma.image.findUnique({
+            where: { id: imageId },
+        });
+
+        if (!image || image.userId !== session.user.id) {
+            return { error: 'Image not found or unauthorized' };
+        }
+
+        // 2. Delete from DB
+        await prisma.image.delete({
+            where: { id: imageId },
+        });
+
+        // 3. Delete file if possible (ignore error if missing)
+        try {
+            const fs = require('fs/promises');
+            const path = require('path');
+            // storageUrl is like "/uploads/userid/filename.jpg"
+            // We need absolute path: process.cwd() + /public + storageUrl
+            const absolutePath = path.join(process.cwd(), 'public', storageUrl);
+            await fs.unlink(absolutePath);
+        } catch (e) {
+            console.error('Failed to delete file from disk (might be missing):', e);
+            // Non-blocking error
+        }
+
+        revalidatePath('/dashboard');
+        return { success: true };
+    } catch (e) {
+        console.error('Delete error:', e);
+        return { error: 'Failed to delete image' };
+    }
+}
