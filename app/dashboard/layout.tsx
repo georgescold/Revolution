@@ -4,8 +4,15 @@ import { OnboardingModal } from "@/components/onboarding/onboarding-modal";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, User, Settings } from "lucide-react";
 import { signOut } from "@/lib/auth";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 async function SignOutButton() {
     'use server';
@@ -29,12 +36,35 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 </span>
             </Link>
             <div className="ml-auto flex items-center gap-2 md:gap-4">
-                <form action={SignOutButton}>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 md:h-10 md:w-10 text-muted-foreground hover:text-foreground">
-                        <LogOut className="h-4 w-4 md:h-5 md:w-5" />
-                        <span className="sr-only">Déconnexion</span>
-                    </Button>
-                </form>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 md:h-10 md:w-10 rounded-full border border-border">
+                            {session.user?.image ? (
+                                <img src={session.user.image} alt="Avatar" className="h-full w-full rounded-full object-cover" />
+                            ) : (
+                                <User className="h-4 w-4 md:h-5 md:w-5" />
+                            )}
+                            <span className="sr-only">Menu utilisateur</span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                            <Link href="/dashboard/profile" className="cursor-pointer">
+                                <Settings className="mr-2 h-4 w-4" />
+                                <span>Mon Profil</span>
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                            <form action={SignOutButton} className="w-full">
+                                <button type="submit" className="flex w-full items-center text-red-500 hover:text-red-700">
+                                    <LogOut className="mr-2 h-4 w-4" />
+                                    <span>Déconnexion</span>
+                                </button>
+                            </form>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
         </header>
     );

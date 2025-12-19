@@ -12,71 +12,90 @@ export async function uploadImage(formData: FormData) {
     const session = await auth();
     if (!session?.user?.id) return { error: 'Unauthorized' };
 
-    const file = formData.get('file') as File;
-    if (!file) return { error: 'No file provided' };
+    const files = formData.getAll('file') as File[];
+    if (!files || files.length === 0) return { error: 'No files provided' };
 
-    if (file.size > 5 * 1024 * 1024) return { error: 'File too large (max 5MB)' }; // Simulating limit
+    // Function to process a single file
+    const processFile = async (file: File) => {
+        if (file.size > 5 * 1024 * 1024) return { error: `File ${file.name} too large (max 5MB)` };
 
-    const buffer = Buffer.from(await file.arrayBuffer());
+        try {
+            const buffer = Buffer.from(await file.arrayBuffer());
 
-    // 1. Save File Locally
-    const relativeUploadDir = `/uploads/${session.user.id}`;
-    const uploadDir = join(process.cwd(), 'public', relativeUploadDir);
+            // 1. Save File Locally
+            const relativeUploadDir = `/uploads/${session.user!.id}`;
+            const uploadDir = join(process.cwd(), 'public', relativeUploadDir);
 
-    try {
-        await mkdir(uploadDir, { recursive: true });
-    } catch (e) {
-        // ignore if exists
+            try {
+                await mkdir(uploadDir, { recursive: true });
+            } catch (e) {
+                // ignore
+            }
+
+            const ext = file.name.split('.').pop();
+            const filename = `${uuidv4()}.${ext}`;
+            const filepath = join(uploadDir, filename);
+            const publicUrl = `${relativeUploadDir}/${filename}`;
+
+            await writeFile(filepath, buffer);
+
+            // 2. Analyze with Claude
+            let analysis: ImageAnalysisResult;
+            try {
+                const base64 = buffer.toString('base64');
+                analysis = await analyzeImage(base64, file.type);
+            } catch (e) {
+                console.error(`Analysis failed for ${file.name}:`, e);
+                // Fallback to basic info
+                analysis = {
+                    description_long: "Analysis failed",
+                    keywords: [],
+                    colors: [],
+                    mood: "Unknown",
+                    style: "Unknown",
+                    composition: "Unknown",
+                    facial_expression: "Unknown",
+                    text_content: "Unknown"
+                };
+            }
+
+            // 3. Save to DB
+            const count = await prisma.image.count();
+            const humanId = `IMG-${String(count + 1).padStart(5, '0')}`;
+
+            await prisma.image.create({
+                data: {
+                    userId: session.user!.id,
+                    humanId,
+                    storageUrl: publicUrl,
+                    descriptionLong: analysis.description_long || "No description",
+                    keywords: JSON.stringify(analysis.keywords || []),
+                    mood: analysis.mood,
+                    style: analysis.style,
+                    colors: JSON.stringify(analysis.colors || []),
+                },
+            });
+
+            return { success: true, file: file.name };
+        } catch (e) {
+            console.error(`Error processing ${file.name}:`, e);
+            return { error: `Failed to process ${file.name}` };
+        }
+    };
+
+    // Process all files in parallel
+    const results = await Promise.all(files.map(processFile));
+
+    // Check if at least one succeeded
+    const successCount = results.filter(r => r.success).length;
+
+    revalidatePath('/dashboard');
+
+    if (successCount === 0) {
+        return { error: 'Failed to upload images' };
     }
 
-    const ext = file.name.split('.').pop();
-    const filename = `${uuidv4()}.${ext}`;
-    const filepath = join(uploadDir, filename);
-    const publicUrl = `${relativeUploadDir}/${filename}`;
-
-    try {
-        await writeFile(filepath, buffer);
-    } catch (e) {
-        return { error: 'Failed to save file' };
-    }
-
-    // 2. Analyze with Claude
-    let analysis: ImageAnalysisResult;
-    try {
-        const base64 = buffer.toString('base64');
-        analysis = await analyzeImage(base64, file.type);
-    } catch (e) {
-        console.error(e);
-        // Fallback if AI fails? Or return error?
-        // Let's create the image but with empty analysis or fail. 
-        // Prompt says "Obligatoirement générer une description".
-        return { error: 'AI Analysis Failed. Please try again.' };
-    }
-
-    // 3. Save to DB
-    try {
-        // Generate readable ID IMG-XXXX
-        const count = await prisma.image.count();
-        const humanId = `IMG-${String(count + 1).padStart(5, '0')}`;
-
-        await prisma.image.create({
-            data: {
-                userId: session.user.id,
-                humanId,
-                storageUrl: publicUrl,
-                descriptionLong: analysis.description_long || "No description",
-                keywords: JSON.stringify(analysis.keywords || []),
-                mood: analysis.mood,
-                style: analysis.style,
-                colors: JSON.stringify(analysis.colors || []),
-            },
-        });
-
-        revalidatePath('/dashboard');
-        return { success: true };
-    } catch (e) {
-        return { error: 'Database Error' };
-    }
+    return { success: true, count: successCount, total: files.length, results };
 }
 
 export async function getUserImages() {

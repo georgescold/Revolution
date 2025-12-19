@@ -16,34 +16,44 @@ export function ImageUploader() {
         const files = e.target.files;
         if (!files || files.length === 0) return;
 
-        // Multi-upload not fully implemented in UI but action handles single.
-        // Iterating for multi-support simplicity
-        const file = files[0];
+        const allFiles = Array.from(files);
+        const total = allFiles.length;
+        let uploadedCount = 0;
 
-        // Hacky progress simulation since server actions don't stream progress easily
-        setProgress(10);
-        const interval = setInterval(() => {
-            setProgress(p => Math.min(p + 5, 90));
-        }, 200);
+        // Batch configuration
+        const BATCH_SIZE = 5;
 
-        const formData = new FormData();
-        formData.append('file', file);
+        // Helper to process a batch
+        const processBatch = async (batchFiles: File[]) => {
+            const formData = new FormData();
+            batchFiles.forEach(f => formData.append('file', f));
+
+            const result = await uploadImage(formData);
+            if (result.success && result.count) {
+                return result.count;
+            }
+            return 0; // Error or 0 uploaded
+        };
 
         startTransition(async () => {
-            const result = await uploadImage(formData);
-            clearInterval(interval);
+            for (let i = 0; i < total; i += BATCH_SIZE) {
+                const batch = allFiles.slice(i, i + BATCH_SIZE);
 
-            if (result.error) {
-                toast.error(result.error);
-                setProgress(0);
-            } else {
-                setProgress(100);
-                toast.success("Image analysée et ajoutée !");
-                setTimeout(() => setProgress(0), 1000);
+                // Update progress based on start of batch
+                const currentProgress = Math.round((uploadedCount / total) * 100);
+                setProgress(Math.max(10, currentProgress)); // Min 10 to show activity
+
+                // Upload batch
+                const processed = await processBatch(batch);
+                uploadedCount += processed;
             }
 
-            // Reset input
-            if (fileInputRef.current) fileInputRef.current.value = '';
+            setProgress(100);
+            toast.success(`${uploadedCount}/${total} images ajoutées avec succès !`);
+            setTimeout(() => {
+                setProgress(0);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            }, 1000);
         });
     };
 
@@ -52,6 +62,7 @@ export function ImageUploader() {
             <input
                 type="file"
                 accept="image/*"
+                multiple
                 className="hidden"
                 ref={fileInputRef}
                 onChange={handleFileChange}
@@ -64,13 +75,13 @@ export function ImageUploader() {
                 {isUploading ? (
                     <div className="flex flex-col items-center gap-2">
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        <p className="text-sm text-muted-foreground">Analyse en cours par Claude...</p>
+                        <p className="text-sm text-muted-foreground">Analyse de {fileInputRef.current?.files?.length || "plusieurs"} images par Claude...</p>
                         <Progress value={progress} className="w-[200px]" />
                     </div>
                 ) : (
                     <>
                         <Upload className="h-10 w-10 text-muted-foreground mb-4" />
-                        <p className="text-sm font-medium">Glisser-déposer ou cliquer pour uploader</p>
+                        <p className="text-sm font-medium">Glisser-déposer ou cliquer pour uploader plusieurs images</p>
                         <p className="text-xs text-muted-foreground mt-1">PNG, JPG jusqu'à 5MB</p>
                     </>
                 )}
