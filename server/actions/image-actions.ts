@@ -60,8 +60,10 @@ export async function uploadImage(formData: FormData) {
             }
 
             // 3. Save to DB
-            const count = await prisma.image.count();
-            const humanId = `IMG-${String(count + 1).padStart(5, '0')}`;
+            // Use Timestamp + Random suffix to ensure uniqueness in parallel
+            const timestamp = Date.now().toString().slice(-6);
+            const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+            const humanId = `IMG-${timestamp}-${random}`;
 
             await prisma.image.create({
                 data: {
