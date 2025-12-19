@@ -1,0 +1,25 @@
+# Render Deployment Configuration
+# This file configures the Render deployment settings
+
+services:
+  - type: web
+    name: revolution
+    runtime: node
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: DATABASE_URL
+        sync: false # Set manually in Render dashboard
+      - key: ANTHROPIC_API_KEY
+        sync: false # Set manually in Render dashboard
+      - key: ANTHROPIC_MODEL
+        value: claude-opus-4-5-20251101
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: NEXTAUTH_URL
+        fromService:
+          type: web
+          name: revolution
+          property: host
