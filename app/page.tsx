@@ -14,9 +14,9 @@ export default function LandingPage() {
         <div className="flex flex-col items-center space-y-4 mb-4">
           {/* Glitch Effect on Text */}
           <h1 className="text-7xl md:text-9xl font-black tracking-tighter text-foreground relative">
-            <span className="absolute -left-[2px] -top-[2px] text-primary opacity-70 mix-blend-multiply animate-pulse">Révolution</span>
-            <span className="absolute -right-[2px] -bottom-[2px] text-secondary opacity-70 mix-blend-multiply animate-pulse">Révolution</span>
-            <span className="relative z-10">Révolution</span>
+            <span className="absolute -left-[2px] -top-[2px] text-primary opacity-70 mix-blend-multiply animate-pulse">Organik</span>
+            <span className="absolute -right-[2px] -bottom-[2px] text-secondary opacity-70 mix-blend-multiply animate-pulse">Organik</span>
+            <span className="relative z-10">Organik</span>
           </h1>
           <p className="text-xl md:text-3xl text-foreground/80 font-bold tracking-tight max-w-2xl">
             Ne suis pas la tendance. <span className="text-primary">Crée-la.</span>
@@ -70,7 +70,7 @@ export default function LandingPage() {
       </main>
 
       <footer className="absolute bottom-6 text-xs md:text-sm font-bold tracking-widest uppercase opacity-40">
-        Révolution © 2025
+        Organik © 2025
       </footer>
     </div>
   );

@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
-  title: "Révolution",
-  description: "Révolutionne ton contenu. Deviens viral.",
+  title: "Organik | TikTok Content Manager",
+  description: "Créez, gérez et optimisez votre contenu TikTok.",
 };
 
 export const viewport = {

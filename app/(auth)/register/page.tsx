@@ -43,9 +43,9 @@ export default function RegisterPage() {
         <Card className="w-full max-w-md bg-card border-2 border-primary shadow-[4px_4px_0px_0px_var(--color-secondary)] transition-all">
             <CardHeader className="space-y-1 text-center">
                 <CardTitle className="text-3xl font-black tracking-tighter uppercase relative inline-block">
-                    <span className="relative z-10">Révolution</span>
-                    <span className="absolute left-[2px] top-[2px] -z-10 text-secondary opacity-50 mix-blend-multiply">Révolution</span>
-                    <span className="absolute -left-[2px] -top-[2px] -z-10 text-primary opacity-50 mix-blend-multiply">Révolution</span>
+                    <span className="relative z-10">Organik</span>
+                    <span className="absolute left-[2px] top-[2px] -z-10 text-secondary opacity-50 mix-blend-multiply">Organik</span>
+                    <span className="absolute -left-[2px] -top-[2px] -z-10 text-primary opacity-50 mix-blend-multiply">Organik</span>
                 </CardTitle>
                 <CardDescription className="font-medium text-muted-foreground/80">
                     Prépare-toi à conquérir les algos.

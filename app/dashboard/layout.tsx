@@ -30,9 +30,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <header className="sticky top-0 z-30 flex h-14 md:h-16 items-center gap-2 md:gap-4 border-b border-border/40 bg-background/95 backdrop-blur px-3 md:px-6">
             <Link href="/dashboard" className="flex items-center space-x-2 md:space-x-3">
                 <span className="inline-block font-black text-xl md:text-2xl tracking-tighter uppercase relative">
-                    <span className="relative z-10">Révolution</span>
-                    <span className="absolute left-[1px] top-[1px] -z-10 text-secondary opacity-50 mix-blend-multiply">Révolution</span>
-                    <span className="absolute -left-[1px] -top-[1px] -z-10 text-primary opacity-50 mix-blend-multiply">Révolution</span>
+                    <span className="relative z-10">Organik</span>
+                    <span className="absolute left-[1px] top-[1px] -z-10 text-secondary opacity-50 mix-blend-multiply">Organik</span>
+                    <span className="absolute -left-[1px] -top-[1px] -z-10 text-primary opacity-50 mix-blend-multiply">Organik</span>
                 </span>
             </Link>
             <div className="ml-auto flex items-center gap-2 md:gap-4">
