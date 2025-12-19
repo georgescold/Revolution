@@ -82,11 +82,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
     }
 
     return (
-        <div className="min-h-screen flex flex-col">
-            <Header />
-            <main className="flex-1 overflow-hidden">
-                {children}
-            </main>
+        <div className="min-h-screen flex flex-col relative overflow-hidden bg-background">
+            {/* Background Ambience - Clean White/Black with Red accents */}
+            <div className="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] bg-primary/10 rounded-full blur-[100px] pointer-events-none mix-blend-multiply z-0" />
+            <div className="fixed bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-secondary/10 rounded-full blur-[120px] pointer-events-none mix-blend-multiply z-0" />
+
+            <div className="relative z-10 w-full flex flex-col min-h-screen">
+                <Header />
+                <main className="flex-1 overflow-hidden flex flex-col">
+                    {children}
+                </main>
+            </div>
         </div>
     );
 }
