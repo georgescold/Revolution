@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { ProfileForm } from "@/components/profile/profile-form";
 
 export default async function ProfilePage() {
@@ -14,7 +16,12 @@ export default async function ProfilePage() {
     if (!profile) redirect("/dashboard");
 
     return (
-        <div className="container max-w-4xl mx-auto py-12 px-4">
+        <div className="container max-w-4xl mx-auto py-8 px-4">
+            <Link href="/dashboard" className="inline-flex items-center text-sm font-bold text-muted-foreground hover:text-primary transition-colors mb-8 group">
+                <ArrowLeft className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform" />
+                Retour au Dashboard
+            </Link>
+
             <div className="flex flex-col items-center mb-12 space-y-2">
                 <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter hover:scale-105 transition-transform cursor-default select-none relative group">
                     <span className="relative z-10">Mon Profil</span>

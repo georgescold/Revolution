@@ -162,3 +162,52 @@ export async function deleteImage(imageId: string, storageUrl: string) {
         return { error: 'Failed to delete image' };
     }
 }
+
+export async function deleteImages(imageIds: string[]) {
+    const session = await auth();
+    if (!session?.user?.id) return { error: 'Unauthorized' };
+
+    try {
+        // 1. Verify ownership (count matching user images)
+        const count = await prisma.image.count({
+            where: {
+                id: { in: imageIds },
+                userId: session.user.id
+            }
+        });
+
+        if (count !== imageIds.length) {
+            return { error: 'Unauthorized or images not found' };
+        }
+
+        // 2. Fetch storage URLs before delete to cleanup files
+        const images = await prisma.image.findMany({
+            where: { id: { in: imageIds } },
+            select: { storageUrl: true }
+        });
+
+        // 3. Delete from DB
+        await prisma.image.deleteMany({
+            where: { id: { in: imageIds } }
+        });
+
+        // 4. Delete files (best effort)
+        const fs = require('fs/promises');
+        const path = require('path');
+
+        await Promise.all(images.map(async (img) => {
+            try {
+                const absolutePath = path.join(process.cwd(), 'public', img.storageUrl);
+                await fs.unlink(absolutePath);
+            } catch {
+                // Ignore missing files
+            }
+        }));
+
+        revalidatePath('/dashboard');
+        return { success: true };
+    } catch (e) {
+        console.error('Bulk delete error:', e);
+        return { error: 'Failed to delete images' };
+    }
+}
