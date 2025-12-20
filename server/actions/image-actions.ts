@@ -13,6 +13,8 @@ export async function uploadImage(formData: FormData) {
     const session = await auth();
     if (!session?.user?.id) return { error: 'Unauthorized' };
 
+    const userId = session.user.id;
+
     const files = formData.getAll('file') as File[];
     if (!files || files.length === 0) return { error: 'No files provided' };
 
@@ -29,7 +31,7 @@ export async function uploadImage(formData: FormData) {
             // [NEW] Check for duplicate
             const existingImage = await prisma.image.findFirst({
                 where: {
-                    userId: session.user.id,
+                    userId: userId,
                     hash: hash
                 }
             });
