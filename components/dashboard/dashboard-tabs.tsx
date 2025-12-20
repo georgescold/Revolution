@@ -5,6 +5,7 @@ import { useState } from 'react';
 type DashboardTabsProps = {
     analyticsContent: React.ReactNode;
     collectionsContent: React.ReactNode;
+    creationContent: React.ReactNode;
     userNav?: React.ReactNode;
 };
 
