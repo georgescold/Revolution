@@ -13,6 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 import { Toaster } from "@/components/ui/sonner";
+import { HomeButton } from "@/components/ui/home-button";
 
 export const metadata: Metadata = {
   title: "Organik | TikTok Content Manager",
@@ -36,6 +37,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground min-h-screen`}
       >
         {children}
+        <HomeButton />
         <Toaster />
       </body>
     </html>

@@ -1,23 +1,59 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { generateHooks, generateCarousel, saveCarousel, HookProposal, Slide } from '@/server/actions/creation-actions';
+import { generateHooks, generateCarousel, saveCarousel, getDrafts, updatePostContent, saveHookAsIdea, getSavedIdeas, HookProposal, Slide } from '@/server/actions/creation-actions';
 import { toast } from 'sonner';
-import { Loader2, Sparkles, Check, RefreshCw } from 'lucide-react';
-import { Slider } from '@/components/ui/slider';
-import { Label } from '@/components/ui/label';
+import { Loader2, Sparkles, Check, RefreshCw, FileText, Clock, ArrowRight, Bookmark, Lightbulb, User } from 'lucide-react';
 
-export function CreationView() {
+
+interface CreationViewProps {
+    initialPost?: {
+        id: string;
+        hookText: string;
+        slides: string; // JSON string
+        status: string;
+    };
+}
+
+export function CreationView({ initialPost }: CreationViewProps) {
     const [step, setStep] = useState<'hooks' | 'config' | 'preview'>('hooks');
     const [hooks, setHooks] = useState<HookProposal[]>([]);
     const [selectedHook, setSelectedHook] = useState<HookProposal | null>(null);
-    const [slideCount, setSlideCount] = useState([5]);
+
     const [slides, setSlides] = useState<Slide[]>([]);
+    const [drafts, setDrafts] = useState<any[]>([]);
+    const [savedIdeas, setSavedIdeas] = useState<any[]>([]);
 
     const [isPending, startTransition] = useTransition();
+
+    useEffect(() => {
+        if (initialPost) {
+            try {
+                const parsedSlides = JSON.parse(initialPost.slides);
+                setSlides(parsedSlides);
+                setSelectedHook({
+                    id: 'edit',
+                    angle: 'Edit',
+                    hook: initialPost.hookText,
+                    reason: 'Editing existing post'
+                });
+                setStep('preview');
+            } catch (e) {
+                toast.error("Erreur au chargement du post");
+            }
+        } else if (step === 'hooks') {
+            loadDrafts();
+        }
+    }, [initialPost, step]);
+
+    const loadDrafts = async () => {
+        const [draftsRes, ideasRes] = await Promise.all([getDrafts(), getSavedIdeas()]);
+        if (draftsRes.success && draftsRes.drafts) setDrafts(draftsRes.drafts);
+        if (ideasRes.success && ideasRes.ideas) setSavedIdeas(ideasRes.ideas);
+    };
 
     const handleGenerateHooks = () => {
         startTransition(async () => {
@@ -32,7 +68,7 @@ export function CreationView() {
     const handleGenerateCarousel = () => {
         if (!selectedHook) return;
         startTransition(async () => {
-            const result = await generateCarousel(selectedHook.hook, slideCount[0]);
+            const result = await generateCarousel(selectedHook.hook);
             if (result.error) toast.error(result.error);
             else if (result.slides) {
                 setSlides(result.slides);
@@ -41,15 +77,56 @@ export function CreationView() {
         });
     };
 
-    const handleSave = () => {
+    const handleSave = (asDraft = false) => {
         startTransition(async () => {
             if (!selectedHook) return;
-            await saveCarousel(selectedHook.hook, slides);
-            toast.success("Carrousel sauvegardé !");
-            // Reset or redirect
-            setStep('hooks');
-            setHooks([]);
+
+            if (initialPost && !asDraft) {
+                // Update existing post
+                const res = await updatePostContent(initialPost.id, slides);
+                if (res.error) {
+                    toast.error(res.error);
+                    return;
+                }
+                toast.success("Modifications enregistrées !");
+                // Don't reset state if editing, maybe redirect? For now stay on page.
+                // window.location.href = '/dashboard'; // Let user decide when to leave
+            } else {
+                // Create new or save draft
+                const res = await saveCarousel(selectedHook.hook, slides, asDraft ? 'draft' : 'created');
+                if (res.error) {
+                    toast.error(res.error);
+                    return;
+                }
+                toast.success(asDraft ? "Brouillon sauvegardé !" : "Carrousel sauvegardé !");
+                if (!initialPost) {
+                    setStep('hooks');
+                    setHooks([]);
+                }
+            }
         });
+    };
+
+    const handleSaveIdea = (hook: HookProposal) => {
+        startTransition(async () => {
+            const res = await saveHookAsIdea(hook);
+            if (res.error) toast.error(res.error);
+            else {
+                toast.success("Idée sauvegardée !");
+                loadDrafts(); // Refresh lists
+            }
+        });
+    };
+
+    const resumeDraft = (draft: any) => {
+        try {
+            const parsedSlides = JSON.parse(draft.slides as string);
+            setSlides(parsedSlides);
+            setSelectedHook({ id: 'draft', angle: 'Draft', hook: draft.hookText, reason: 'Resume' });
+            setStep('preview');
+        } catch (e) {
+            toast.error("Impossible d'ouvrir ce brouillon");
+        }
     };
 
     // Step 1: Hooks
@@ -101,7 +178,7 @@ export function CreationView() {
                 </div>
 
                 {hooks.length > 0 && (
-                    <div className="grid md:grid-cols-3 gap-6">
+                    <div className="grid md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         {hooks.map((h, i) => (
                             <Card key={i}
                                 onClick={() => { setSelectedHook(h); setStep('config'); }}
@@ -114,41 +191,67 @@ export function CreationView() {
                                 <CardContent>
                                     <p className="text-sm text-muted-foreground">{h.reason}</p>
                                 </CardContent>
-                                <CardFooter>
-                                    <Button variant="ghost" className="w-full group-hover:bg-primary group-hover:text-primary-foreground">Choisir cet angle</Button>
+                                <CardFooter className="grid grid-cols-4 gap-2">
+                                    <Button variant="outline" size="icon" onClick={(e) => { e.stopPropagation(); handleSaveIdea(h); }} title="Sauvegarder pour plus tard">
+                                        <Bookmark className="w-4 h-4" />
+                                    </Button>
+                                    <Button className="col-span-3 group-hover:bg-primary group-hover:text-primary-foreground" onClick={() => { setSelectedHook(h); setStep('config'); }}>
+                                        Choisir cet angle
+                                    </Button>
                                 </CardFooter>
                             </Card>
                         ))}
+                    </div>
+                )}
+
+                {/* Drafts Section */}
+                {drafts.length > 0 && hooks.length === 0 && (
+                    <div className="space-y-4">
+                        <h3 className="text-xl font-bold flex items-center gap-2">
+                            <FileText className="w-5 h-5" /> Reprendre un brouillon
+                        </h3>
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {drafts.map((draft) => (
+                                <Card key={draft.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => resumeDraft(draft)}>
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-base line-clamp-2">{draft.hookText}</CardTitle>
+                                        <CardDescription className="flex items-center gap-2 text-xs">
+                                            <Clock className="w-3 h-3" />
+                                            {new Date(draft.createdAt).toLocaleDateString()}
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardFooter className="pt-2">
+                                        <Button variant="ghost" size="sm" className="w-full justify-between group">
+                                            Continuer <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                        </Button>
+                                    </CardFooter>
+                                </Card>
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>
         );
     }
 
-    // Step 2: Config (Slide count)
+    // Step 2: Config (AI Strategy)
     if (step === 'config') {
         return (
             <div className="max-w-xl mx-auto space-y-8 py-12">
                 <div className="space-y-2 text-center">
-                    <h3 className="text-xl font-bold">Configuration</h3>
+                    <h3 className="text-xl font-bold">Stratégie IA</h3>
                     <p className="text-muted-foreground">Hook choisi : "{selectedHook?.hook}"</p>
                 </div>
 
                 <Card className="p-6 space-y-8">
-                    <div className="space-y-4">
-                        <div className="flex justify-between">
-                            <Label>Nombre de slides</Label>
-                            <span className="font-bold text-primary text-xl">{slideCount[0]}</span>
+                    <div className="space-y-4 text-center">
+                        <div className="p-4 bg-primary/10 rounded-xl mb-4">
+                            <Sparkles className="w-8 h-8 text-primary mx-auto mb-2" />
+                            <h4 className="font-semibold text-primary">Mode Claude Opus Auto-Pilot</h4>
+                            <p className="text-sm text-muted-foreground mt-2">
+                                Je vais analyser la complexité de ce sujet pour déterminer le nombre de slides parfait (6 à 8) afin de maximiser la rétention.
+                            </p>
                         </div>
-                        <Slider
-                            value={slideCount}
-                            onValueChange={setSlideCount}
-                            min={5}
-                            max={10}
-                            step={1}
-                            className="py-4"
-                        />
-                        <p className="text-xs text-muted-foreground text-center">Entre 5 et 8 recommandé pour le Watch Time.</p>
                     </div>
 
                     <Button size="lg" className="w-full" onClick={handleGenerateCarousel} disabled={isPending}>
@@ -157,7 +260,7 @@ export function CreationView() {
                                 <Loader2 className="mr-2 animate-spin" /> Rédaction & Recherche Images...
                             </>
                         ) : (
-                            "Générer le Carrousel"
+                            "Générer le Carrousel Optimisé"
                         )}
                     </Button>
                 </Card>
@@ -170,12 +273,17 @@ export function CreationView() {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Preview du Carrousel</h2>
+                <h2 className="text-2xl font-bold">{initialPost ? 'Modifier le Post' : 'Preview du Carrousel'}</h2>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setStep('config')}>Modifier</Button>
-                    <Button onClick={handleSave} disabled={isPending} className="bg-secondary text-white hover:bg-secondary/90">
+                    {!initialPost && (
+                        <Button variant="outline" onClick={() => handleSave(true)} disabled={isPending}>
+                            <FileText className="mr-2 h-4 w-4" />
+                            Sauvegarder Brouillon
+                        </Button>
+                    )}
+                    <Button onClick={() => handleSave(false)} disabled={isPending} className="bg-secondary text-white hover:bg-secondary/90">
                         {isPending ? <Loader2 className="animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                        Valider & Enregistrer
+                        {initialPost ? 'Enregistrer les modifications' : 'Valider & Enregistrer'}
                     </Button>
                 </div>
             </div>

@@ -11,11 +11,17 @@ export function ImageUploader() {
     const [isUploading, startTransition] = useTransition();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [progress, setProgress] = useState(0);
+    const cancelRef = useRef(false);
+
+    const handleCancel = () => {
+        cancelRef.current = true;
+    };
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
 
+        cancelRef.current = false;
         const allFiles = Array.from(files);
         const total = allFiles.length;
         let uploadedCount = 0;
@@ -37,6 +43,11 @@ export function ImageUploader() {
 
         startTransition(async () => {
             for (let i = 0; i < total; i += BATCH_SIZE) {
+                if (cancelRef.current) {
+                    toast.info("Upload annulé");
+                    break;
+                }
+
                 const batch = allFiles.slice(i, i + BATCH_SIZE);
 
                 // Update progress based on start of batch
@@ -49,7 +60,9 @@ export function ImageUploader() {
             }
 
             setProgress(100);
-            toast.success(`${uploadedCount}/${total} images ajoutées avec succès !`);
+            if (!cancelRef.current) {
+                toast.success(`${uploadedCount}/${total} images ajoutées avec succès !`);
+            }
             setTimeout(() => {
                 setProgress(0);
                 if (fileInputRef.current) fileInputRef.current.value = '';
@@ -70,13 +83,19 @@ export function ImageUploader() {
 
             <div
                 onClick={() => !isUploading && fileInputRef.current?.click()}
-                className={`border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/10 transition-colors ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/10 transition-colors ${isUploading ? 'cursor-default' : ''}`}
             >
                 {isUploading ? (
-                    <div className="flex flex-col items-center gap-2">
+                    <div className="flex flex-col items-center gap-4 w-full" onClick={(e) => e.stopPropagation()}>
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        <p className="text-sm text-muted-foreground">Analyse de {fileInputRef.current?.files?.length || "plusieurs"} images par Claude...</p>
-                        <Progress value={progress} className="w-[200px]" />
+                        <div className="space-y-1 text-center">
+                            <p className="text-sm font-medium">Analyse en cours...</p>
+                            <p className="text-xs text-muted-foreground">{fileInputRef.current?.files?.length || "plusieurs"} images</p>
+                        </div>
+                        <Progress value={progress} className="w-[200px] h-2 bg-secondary/20" />
+                        <Button variant="destructive" size="sm" onClick={handleCancel} className="mt-2">
+                            Annuler
+                        </Button>
                     </div>
                 ) : (
                     <>

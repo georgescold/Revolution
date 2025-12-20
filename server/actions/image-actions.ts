@@ -7,6 +7,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
+import { createHash } from 'crypto';
 
 export async function uploadImage(formData: FormData) {
     const session = await auth();
@@ -21,6 +22,21 @@ export async function uploadImage(formData: FormData) {
 
         try {
             const buffer = Buffer.from(await file.arrayBuffer());
+
+            // [NEW] Calculate Hash
+            const hash = createHash('sha256').update(buffer).digest('hex');
+
+            // [NEW] Check for duplicate
+            const existingImage = await prisma.image.findFirst({
+                where: {
+                    userId: session.user.id,
+                    hash: hash
+                }
+            });
+
+            if (existingImage) {
+                return { success: true, file: file.name, duplicate: true };
+            }
 
             // 1. Save File Locally
             const relativeUploadDir = `/uploads/${session.user!.id}`;
@@ -70,6 +86,7 @@ export async function uploadImage(formData: FormData) {
                     user: { connect: { id: session.user!.id } },
                     humanId,
                     storageUrl: publicUrl,
+                    hash, // [NEW] Save hash
                     descriptionLong: analysis.description_long || "No description",
                     keywords: JSON.stringify(analysis.keywords || []),
                     mood: analysis.mood,

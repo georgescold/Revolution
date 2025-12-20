@@ -17,21 +17,48 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  profile       Profile?
+  
+  // Relations
+  profiles      Profile[]
+  activeProfileId String?  // ID of the currently active profile
+  
+  // Legacy/Global relations (still kept for data integrity or global admin)
   images        Image[]
+  
+  // To be deprecated or linked via Profile in logic
   posts         Post[]
+  followerSnapshots FollowerSnapshot[]
 }
 
 model Profile {
   id          String   @id @default(cuid())
-  userId      String   @unique
+  userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   tiktokName  String?
   bio         String?
   persona     String?  @db.Text
   contentGoal String?  @db.Text
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  avatarUrl   String?
+  followersCount Int      @default(0)
+  
+  // Relations
+  posts       Post[]
+  followerSnapshots FollowerSnapshot[]
+}
+
+model FollowerSnapshot {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  profileId String?
+  profile   Profile? @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
+  count     Int
+  createdAt DateTime @default(now())
 }
 
 model Image {
@@ -40,6 +67,7 @@ model Image {
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   storageUrl      String
+  hash            String?  // [NEW] SHA-256 hash
   descriptionLong String   @db.Text
   keywords        String   // JSON string
   mood            String?
@@ -52,13 +80,20 @@ model Post {
   id         String   @id @default(cuid())
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  profileId  String?
+  profile    Profile? @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
   platform   String   // tiktok, instagram
   hookText   String   @db.Text
+  title       String?  @db.Text // [NEW]
+  description String?  @db.Text // [NEW]
   slideCount Int?
   slides     String?  @db.Text // JSON with slides script and image refs
   origin     String   @default("generated") // generated, imported
   status     String   @default("draft") // draft, created, published
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
   metrics    Metrics?
 }
 

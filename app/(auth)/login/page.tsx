@@ -30,7 +30,7 @@ export default function LoginPage() {
                     toast.error('Identifiants invalides');
                 } else {
                     toast.success('Connexion réussie');
-                    router.push('/dashboard');
+                    router.push('/select-profile');
                     router.refresh();
                 }
             } catch (e) {
