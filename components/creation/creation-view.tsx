@@ -13,7 +13,7 @@ interface CreationViewProps {
     initialPost?: {
         id: string;
         hookText: string;
-        slides: string; // JSON string
+        slides: string | null; // JSON string
         status: string;
     };
 }
@@ -32,7 +32,7 @@ export function CreationView({ initialPost }: CreationViewProps) {
     useEffect(() => {
         if (initialPost) {
             try {
-                const parsedSlides = JSON.parse(initialPost.slides);
+                const parsedSlides = JSON.parse(initialPost.slides ?? '[]');
                 setSlides(parsedSlides);
                 setSelectedHook({
                     id: 'edit',
