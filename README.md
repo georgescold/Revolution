@@ -38,28 +38,27 @@ npm install
 ```
 
 ### 2. Configuration (.env)
-Créez un file `.env` à la racine :
+> **Important** : Ce fichier contient les secrets (Base de données, Auth). Ne le committez jamais.
+> **Pour rejoindre le projet** : Demandez le fichier `.env` à l'administrateur.
+
+Exemple de structure `.env` :
 ```env
-# Database (Local SQLite)
-DATABASE_URL="file:./dev.db"
+# Connection Supabase / Postgres
+DATABASE_URL="postgresql://postgres.[ref]:[password]@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://postgres.[ref]:[password]@aws-0-eu-central-1.pooler.supabase.com:5432/postgres"
 
 # Auth (NextAuth)
-AUTH_SECRET="une-chaine-aleatoire-securisee"
+AUTH_SECRET="générer-une-clé-aléatoire-ici"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
-
-# AI (Anthropic)
-ANTHROPIC_API_KEY="sk-ant-..."
-ANTHROPIC_MODEL="claude-3-5-sonnet-latest"
 ```
 
-### 3. Base de Données
-Initialisez la base de données SQLite :
-```bash
-npx prisma migrate dev --name init
-```
+### 3. Clé API & IA
+L'application **n'utilise plus** de clé API globale dans le `.env`.
+Chaque utilisateur doit renseigner sa propre clé Anthropic (`sk-...`) dans les **Réglages** de l'application une fois connecté.
 
 ### 4. Lancer le serveur
 ```bash
+npx prisma generate
 npm run dev
 ```
 Rendez-vous sur [http://localhost:3000](http://localhost:3000).
