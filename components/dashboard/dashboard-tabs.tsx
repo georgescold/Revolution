@@ -6,11 +6,12 @@ type DashboardTabsProps = {
     analyticsContent: React.ReactNode;
     collectionsContent: React.ReactNode;
     creationContent: React.ReactNode;
+    apiKeyContent: React.ReactNode;
     userNav?: React.ReactNode;
 };
 
-export function DashboardTabs({ analyticsContent, collectionsContent, creationContent, userNav }: DashboardTabsProps) {
-    const [activeTab, setActiveTab] = useState<'analytics' | 'collections' | 'creation'>('analytics');
+export function DashboardTabs({ analyticsContent, collectionsContent, creationContent, apiKeyContent, userNav }: DashboardTabsProps) {
+    const [activeTab, setActiveTab] = useState<'analytics' | 'collections' | 'creation' | 'apikey'>('analytics');
 
     return (
         <div className="flex flex-col h-full">
@@ -54,6 +55,18 @@ export function DashboardTabs({ analyticsContent, collectionsContent, creationCo
                     >
                         CRÉATION
                     </button>
+                    <button
+                        onClick={() => setActiveTab('apikey')}
+                        className={`
+                            relative px-6 py-2.5 font-bold text-sm transition-all rounded-full
+                            ${activeTab === 'apikey'
+                                ? 'bg-secondary text-secondary-foreground'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/20'
+                            }
+                        `}
+                    >
+                        CLÉ API
+                    </button>
                 </div>
 
                 {/* Right Side Icons */}
@@ -74,6 +87,9 @@ export function DashboardTabs({ analyticsContent, collectionsContent, creationCo
                 </div>
                 <div style={{ display: activeTab === 'creation' ? 'block' : 'none' }}>
                     {creationContent}
+                </div>
+                <div style={{ display: activeTab === 'apikey' ? 'block' : 'none' }}>
+                    {apiKeyContent}
                 </div>
             </div>
         </div>

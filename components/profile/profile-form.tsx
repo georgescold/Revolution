@@ -14,16 +14,17 @@ interface ProfileFormProps {
         tiktokName: string;
         tiktokBio: string;
         persona: string;
-        contentGoal: string;
+        targetAudience?: string;
+        leadMagnet?: string;
         avatarUrl?: string;
         followersCount?: number;
+        hashtags?: string;
     }
 }
 
 export function ProfileForm({ initialData }: ProfileFormProps) {
     const [formData, setFormData] = useState({
         ...initialData,
-        followersCount: initialData.followersCount || 0
     });
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(initialData.avatarUrl || null);
@@ -44,8 +45,9 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
             formDataToSend.append('tiktokName', formData.tiktokName);
             formDataToSend.append('tiktokBio', formData.tiktokBio);
             formDataToSend.append('persona', formData.persona);
-            formDataToSend.append('contentGoal', formData.contentGoal);
-            formDataToSend.append('followersCount', formData.followersCount.toString());
+            formDataToSend.append('targetAudience', formData.targetAudience || '');
+            formDataToSend.append('leadMagnet', formData.leadMagnet || '');
+            formDataToSend.append('hashtags', formData.hashtags || '');
             if (avatarFile) {
                 formDataToSend.append('avatar', avatarFile);
             }
@@ -88,77 +90,90 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
                 </div>
 
                 <div className="flex-1 space-y-6 w-full">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <Label htmlFor="tiktokName" className="text-base font-bold flex items-center gap-2">
-                                <AtSign className="w-4 h-4 text-primary" /> Nom TikTok
-                            </Label>
-                            <Input
-                                id="tiktokName"
-                                value={formData.tiktokName}
-                                onChange={(e) => setFormData({ ...formData, tiktokName: e.target.value })}
-                                className="border-2 border-border focus-visible:border-primary h-12"
-                                placeholder="@tonpseudo"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="followersCount" className="text-base font-bold flex items-center gap-2">
-                                <Sparkles className="w-4 h-4 text-primary" /> Abonnés
-                            </Label>
-                            <Input
-                                id="followersCount"
-                                type="number"
-                                value={formData.followersCount}
-                                onChange={(e) => setFormData({ ...formData, followersCount: parseInt(e.target.value) || 0 })}
-                                className="border-2 border-border focus-visible:border-primary h-12"
-                                placeholder="0"
-                            />
-                        </div>
-                    </div>
-
                     <div className="space-y-2">
-                        <Label htmlFor="persona" className="text-base font-bold flex items-center gap-2">
-                            <User className="w-4 h-4 text-primary" /> Persona
+                        <Label htmlFor="tiktokName" className="text-base font-bold flex items-center gap-2">
+                            <AtSign className="w-4 h-4 text-primary" /> Nom TikTok
+                        </Label>
+                        <Input
+                            id="tiktokName"
+                            value={formData.tiktokName}
+                            onChange={(e) => setFormData({ ...formData, tiktokName: e.target.value })}
+                            className="border-2 border-border focus-visible:border-primary h-12"
+                            placeholder="@tonpseudo"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="tiktokBio" className="text-base font-bold flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-primary" /> Bio
                         </Label>
                         <Textarea
-                            id="persona"
-                            value={formData.persona}
-                            onChange={(e) => setFormData({ ...formData, persona: e.target.value })}
-                            className="min-h-[100px] border-2 border-border focus-visible:border-primary resize-none"
-                            placeholder="Qui incarnes-tu ?"
+                            id="tiktokBio"
+                            value={formData.tiktokBio}
+                            onChange={(e) => setFormData({ ...formData, tiktokBio: e.target.value })}
+                            className="min-h-[80px] border-2 border-border focus-visible:border-primary resize-none"
+                            placeholder="Ta bio qui déchire..."
                         />
                     </div>
                 </div>
             </div>
 
             <div className="space-y-2">
-                <Label htmlFor="tiktokBio" className="text-base font-bold flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-primary" /> Bio
+                <Label htmlFor="persona" className="text-base font-bold flex items-center gap-2">
+                    <User className="w-4 h-4 text-primary" /> Autorité
                 </Label>
                 <Textarea
-                    id="tiktokBio"
-                    value={formData.tiktokBio}
-                    onChange={(e) => setFormData({ ...formData, tiktokBio: e.target.value })}
-                    className="min-h-[80px] border-2 border-border focus-visible:border-primary resize-none"
-                    placeholder="Ta bio qui déchire..."
+                    id="persona"
+                    value={formData.persona}
+                    onChange={(e) => setFormData({ ...formData, persona: e.target.value })}
+                    className="min-h-[100px] border-2 border-border focus-visible:border-primary resize-none"
+                    placeholder="Qui incarnes-tu ?"
                 />
             </div>
 
             <div className="space-y-2">
-                <Label htmlFor="contentGoal" className="text-base font-bold flex items-center gap-2">
-                    <Target className="w-4 h-4 text-primary" /> Objectif de contenu
+                <Label htmlFor="targetAudience" className="text-base font-bold flex items-center gap-2">
+                    <User className="w-4 h-4 text-primary" /> Persona
                 </Label>
                 <Textarea
-                    id="contentGoal"
-                    value={formData.contentGoal}
-                    onChange={(e) => setFormData({ ...formData, contentGoal: e.target.value })}
-                    className="min-h-[80px] border-2 border-border focus-visible:border-primary resize-none"
-                    placeholder="Ton objectif principal..."
+                    id="targetAudience"
+                    value={formData.targetAudience}
+                    onChange={(e) => setFormData({ ...formData, targetAudience: e.target.value })}
+                    className="min-h-[100px] border-2 border-border focus-visible:border-primary resize-none"
+                    placeholder="Quelle est ta cible à travers ton contenu ?"
                 />
             </div>
 
-            <div className="flex justify-between items-center pt-8 border-t border-border mt-8">
+
+
+
+
+            <div className="space-y-2">
+                <Label htmlFor="leadMagnet" className="text-base font-bold flex items-center gap-2">
+                    <Target className="w-4 h-4 text-primary" /> Leadmagnet
+                </Label>
+                <Textarea
+                    id="leadMagnet"
+                    value={formData.leadMagnet}
+                    onChange={(e) => setFormData({ ...formData, leadMagnet: e.target.value })}
+                    className="min-h-[80px] border-2 border-border focus-visible:border-primary resize-none"
+                    placeholder="Qu'as-tu à offrir à ta communauté afin de récupérer leur email ?"
+                />
+            </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="hashtags" className="text-base font-bold flex items-center gap-2">
+                    <Target className="w-4 h-4 text-primary" /> Hashtags par défaut
+                </Label>
+                <Textarea
+                    id="hashtags"
+                    value={formData.hashtags}
+                    onChange={(e) => setFormData({ ...formData, hashtags: e.target.value })}
+                    className="min-h-[80px] border-2 border-border focus-visible:border-primary resize-none"
+                    placeholder="#viral #student #..."
+                />
+            </div>
+
+            <div className="flex flex-col-reverse md:flex-row justify-between items-center pt-8 border-t border-border mt-8 gap-4">
                 <Button
                     type="button"
                     onClick={async () => {
@@ -173,7 +188,7 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
                         }
                     }}
                     variant="ghost"
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 w-full md:w-auto"
                 >
                     <Trash className="mr-2 h-4 w-4" />
                     Supprimer ce profil
@@ -182,7 +197,7 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
                 <Button
                     type="submit"
                     disabled={isPending}
-                    className="bg-primary hover:bg-primary text-white font-black text-lg px-8 py-6 rounded-none glitch-hover uppercase tracking-wider"
+                    className="bg-primary hover:bg-primary text-white font-black text-lg px-8 py-6 rounded-none glitch-hover uppercase tracking-wider w-full md:w-auto"
                 >
                     {isPending && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
                     Sauvegarder

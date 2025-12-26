@@ -27,18 +27,25 @@ export function TopPostsCard({ topPosts }: TopPostsCardProps) {
                 <div className="space-y-4">
                     {displayedPosts.map((post: any, index: number) => (
                         <PostDetailsModal key={post.id} postId={post.id} initialTitle={post.title || post.hookText}>
-                            <div className="flex items-start gap-3 hover:bg-white/5 p-2 rounded -ml-2 transition-colors cursor-pointer">
-                                <span className="flex-shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary mt-0.5">
+                            <div className="flex items-center gap-3 hover:bg-white/5 p-2 rounded -ml-2 transition-colors cursor-pointer w-full">
+                                <span className="flex-shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                                     {index + 1}
                                 </span>
-                                <div className="space-y-1 overflow-hidden">
+                                <div className="space-y-1 flex-1 overflow-hidden min-w-0">
                                     <p className="text-sm font-medium leading-none truncate" title={post.title || post.hookText}>
                                         {post.title || post.hookText}
                                     </p>
-                                    <p className="text-xs text-muted-foreground w-full flex justify-between gap-4">
-                                        <span>{post.metrics?.views?.toLocaleString()} vues</span>
-                                        <span className={post.platform === 'tiktok' ? 'text-blue-400' : 'text-pink-500'}>{post.platform}</span>
+                                    <p className="text-xs text-muted-foreground">
+                                        {post.metrics?.views?.toLocaleString()} vues
                                     </p>
+                                </div>
+                                <div className="flex-shrink-0">
+                                    <span className={cn(
+                                        "text-xs font-medium px-2 py-0.5 rounded-full bg-secondary/50",
+                                        post.platform === 'tiktok' ? 'text-blue-400 bg-blue-500/10' : 'text-pink-500 bg-pink-500/10'
+                                    )}>
+                                        {post.platform}
+                                    </span>
                                 </div>
                             </div>
                         </PostDetailsModal>

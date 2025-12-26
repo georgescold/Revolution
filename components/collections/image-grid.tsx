@@ -5,12 +5,13 @@ import { Badge } from '@/components/ui/badge';
 import { useState, useTransition } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Loader2, AlertCircle, CheckCircle2, X } from 'lucide-react';
+import { Trash2, Loader2, AlertCircle, CheckCircle2, X, FolderPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { deleteImage, deleteImages } from '@/server/actions/image-actions';
 import { toast } from 'sonner';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { cn } from '@/lib/utils';
+import { AddToCollectionDialog } from './add-to-collection-dialog';
 
 // Helper to safely get keywords as array (handles both string and array)
 function getKeywordsArray(keywords: string | string[] | null | undefined): string[] {
@@ -37,6 +38,7 @@ type ClientImage = {
 
 export function ImageGrid({ images }: { images: ClientImage[] }) {
     const [selectedImage, setSelectedImage] = useState<ClientImage | null>(null);
+    const [imageToAdd, setImageToAdd] = useState<string | null>(null);
     const [isPending, startTransition] = useTransition();
 
     // Bulk Selection State
@@ -167,11 +169,24 @@ export function ImageGrid({ images }: { images: ClientImage[] }) {
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
                                     <div className="absolute top-2 right-2 flex gap-2">
                                         <Button
+                                            variant="secondary"
+                                            size="icon"
+                                            className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setImageToAdd(img.id);
+                                            }}
+                                            title="Ajouter à une collection"
+                                        >
+                                            <FolderPlus className="h-4 w-4" />
+                                        </Button>
+                                        <Button
                                             variant="destructive"
                                             size="icon"
                                             className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
                                             onClick={(e) => handleDelete(e, img)}
                                             disabled={isPending}
+                                            title="Supprimer"
                                         >
                                             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                                         </Button>
@@ -188,6 +203,12 @@ export function ImageGrid({ images }: { images: ClientImage[] }) {
                     );
                 })}
             </div>
+
+            <AddToCollectionDialog
+                open={!!imageToAdd}
+                onOpenChange={(open) => !open && setImageToAdd(null)}
+                imageId={imageToAdd || ""}
+            />
 
             <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
                 <DialogContent className="max-w-2xl bg-card border-2 border-border">

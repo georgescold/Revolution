@@ -24,9 +24,12 @@ export function PostsTable({ posts }: { posts: any[] }) {
                     <table className="w-full caption-bottom text-sm text-left">
                         <thead className="[&_tr]:border-b">
                             <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                                <th className="h-12 px-4 align-middle font-medium text-muted-foreground w-[100px]">Date</th>
                                 <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Hook / Titre</th>
                                 <th className="h-12 px-4 align-middle font-medium text-muted-foreground hidden md:table-cell">Plateforme</th>
                                 <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Vues</th>
+                                <th className="h-12 px-4 align-middle font-medium text-muted-foreground text-right">Likes</th>
+                                <th className="h-12 px-4 align-middle font-medium text-muted-foreground text-right">Com.</th>
                                 <th className="h-12 px-4 align-middle font-medium text-muted-foreground text-right">Saves</th>
                                 <th className="h-12 px-4 align-middle font-medium text-muted-foreground text-right">Note</th>
                                 <th className="h-12 px-4 align-middle font-medium text-muted-foreground"></th>
@@ -38,7 +41,7 @@ export function PostsTable({ posts }: { posts: any[] }) {
                             ))}
                             {posts.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                                    <td colSpan={9} className="p-8 text-center text-muted-foreground">
                                         Aucune donnée. Ajoute ton premier post !
                                     </td>
                                 </tr>
@@ -67,6 +70,9 @@ function PostRow({ post }: { post: any }) {
     return (
         <PostDetailsModal postId={post.id} initialTitle={post.title || post.hookText}>
             <tr className="border-b border-border/10 transition-colors hover:bg-muted/50 cursor-pointer">
+                <td className="p-4 align-middle text-sm text-muted-foreground">
+                    {new Date(post.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                </td>
                 <td className="p-4 align-middle font-medium">
                     <div className="flex flex-col">
                         <span className="font-bold">{post.title || post.hookText}</span>
@@ -84,9 +90,13 @@ function PostRow({ post }: { post: any }) {
                     </Badge>
                 </td>
                 <td className="p-4 align-middle">{post.metrics?.views}</td>
+                <td className="p-4 align-middle text-right">{post.metrics?.likes}</td>
+                <td className="p-4 align-middle text-right">{post.metrics?.comments}</td>
                 <td className="p-4 align-middle text-right">{post.metrics?.saves}</td>
                 <td className="p-4 align-middle text-right">
-                    {(post.metrics?.saves || 0) > 100 ? (
+                    {(post.metrics?.views || 0) > 100000 ? (
+                        <Badge className="bg-secondary text-white border-0 font-bold shadow-[0_0_10px_rgba(0,0,0,0.2)]">Ultra Viral</Badge>
+                    ) : (post.metrics?.saves || 0) > 100 ? (
                         <Badge className="bg-secondary text-white">Viral</Badge>
                     ) : (
                         <span className="text-muted-foreground">-</span>

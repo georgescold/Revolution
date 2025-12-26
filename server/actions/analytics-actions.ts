@@ -14,6 +14,9 @@ const SlideSchema = z.object({
 
 const AddPostSchema = z.object({
     platform: z.enum(['tiktok', 'instagram']),
+    title: z.string().optional(),
+    description: z.string().optional(),
+    date: z.string().optional(), // ISO date string
     slides: z.array(SlideSchema).min(1, "Au moins une slide est requise"),
     views: z.coerce.number().default(0),
     likes: z.coerce.number().default(0),
@@ -52,11 +55,14 @@ export async function addPost(formData: z.infer<typeof AddPostSchema>) {
                 userId: session.user.id,
                 profileId: activeProfileId, // Link to active profile
                 platform: formData.platform,
+                title: formData.title || null,
+                description: formData.description || null,
                 hookText: formData.slides[0]?.text || "Untitled Post",
                 slideCount: formData.slides.length,
                 slides: JSON.stringify(formData.slides),
                 origin: "imported",
                 status: "published",
+                createdAt: formData.date ? new Date(formData.date) : undefined, // Use provided date or default to now
                 metrics: {
                     create: {
                         views: formData.views,
@@ -76,13 +82,85 @@ export async function addPost(formData: z.infer<typeof AddPostSchema>) {
     }
 }
 
+export async function updateFollowers(count: number) {
+    const session = await auth();
+    if (!session?.user?.id) return { error: 'Unauthorized' };
+
+    const activeProfileId = await getActiveProfileId(session.user.id);
+    if (!activeProfileId) return { error: 'No active profile found' };
+
+    try {
+        // 1. Update Profile
+        await prisma.profile.update({
+            where: { id: activeProfileId },
+            data: { followersCount: count }
+        });
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        // 2. Update/Create Snapshot for today
+        // const today = new Date(); // Already declared
+        // today.setHours(0, 0, 0, 0); // Already set
+        // const tomorrow = new Date(today); // Already declared
+        // tomorrow.setDate(tomorrow.getDate() + 1); // Already set
+
+        // Find ALL snapshots for today to clean up duplicates
+        const todaysSnapshots = await prisma.analyticsSnapshot.findMany({
+            where: {
+                profileId: activeProfileId,
+                metric: 'followers',
+                date: {
+                    gte: today,
+                    lt: tomorrow
+                }
+            },
+            orderBy: { date: 'desc' } // Latest first
+        });
+
+        if (todaysSnapshots.length > 0) {
+            // Update the most recent one
+            const latest = todaysSnapshots[0];
+            await prisma.analyticsSnapshot.update({
+                where: { id: latest.id },
+                data: { value: count }
+            });
+
+            // Delete duplicates if any exist (cleanup old bad data)
+            if (todaysSnapshots.length > 1) {
+                const idsToDelete = todaysSnapshots.slice(1).map(s => s.id);
+                await prisma.analyticsSnapshot.deleteMany({
+                    where: { id: { in: idsToDelete } }
+                });
+            }
+        } else {
+            // Create new if none exists
+            await prisma.analyticsSnapshot.create({
+                data: {
+                    profileId: activeProfileId,
+                    metric: 'followers',
+                    value: count,
+                    date: new Date() // Use exact time for precision
+                }
+            });
+        }
+
+        revalidatePath('/dashboard');
+        return { success: true };
+    } catch (e) {
+        console.error(e);
+        return { error: 'Failed to update followers' };
+    }
+}
+
 export async function getDashboardStats() {
     const session = await auth();
     if (!session?.user?.id) return null;
 
     const activeProfileId = await getActiveProfileId(session.user.id);
-    // If no profile, return empty stats or defaults
-    if (!activeProfileId) return { posts: [], stats: { views: 0, likes: 0, saves: 0, engagement: 0, engagementTrend: 'neutral', followers: 0, followersTrend: 0, followersTrendDirection: 'neutral' }, topPosts: [] };
+    if (!activeProfileId) return { posts: [], stats: { views: 0, totalViews: 0, likes: 0, saves: 0, engagement: 0, engagementTrend: 'neutral', followers: 0, followersTrend: 0, followersTrendDirection: 'neutral' }, topPosts: [], history: { views: [], followers: [] } };
 
     const posts = await prisma.post.findMany({
         where: { userId: session.user.id, profileId: activeProfileId },
@@ -90,83 +168,130 @@ export async function getDashboardStats() {
         orderBy: { createdAt: 'desc' }
     });
 
+    // --- Stats Calculation ---
+    // Last 7 posts logic for Engagement
+    const last7Posts = posts.slice(0, 7);
+    const previous7Posts = posts.slice(7, 14);
 
-    // Get last 14 posts to calculate engagement trend
-    const last14Posts = posts.slice(0, 14);
-    const last7Posts = last14Posts.slice(0, 7);
-    const previous7Posts = last14Posts.slice(7, 14);
-
-    // Calculate views for last 7 posts
     const viewsLast7 = last7Posts.reduce((sum, p) => sum + (p.metrics?.views || 0), 0);
 
-    // Calculate engagement (views + saves + comments) for last 7 posts
-    const engagementLast7 = last7Posts.reduce((sum, p) => {
-        const m = p.metrics;
-        return sum + (m?.views || 0) + (m?.saves || 0) + (m?.comments || 0);
-    }, 0);
+    // Engagement = Views + Saves + Comments (simplified interactions)
+    // Or just (Likes + Saves + Comments) / Views? Users usually mean Total Interactions here unless specified.
+    // Based on previous code: sum of views+saves+comments (?) 
+    // Wait, previous code was: sum + views + saves + comments. That's weird. "Engagement" usually excludes views. 
+    // But I will stick to previous logic to avoid regression unless requested.
+    // actually, let's look at previous code: `sum + (m?.views || 0) + ...`
+    // User requested "Engagement ... +100%". 
+    // I'll keep the same calc.
 
-    // Calculate engagement for previous 7 posts
-    const engagementPrevious7 = previous7Posts.reduce((sum, p) => {
-        const m = p.metrics;
-        return sum + (m?.views || 0) + (m?.saves || 0) + (m?.comments || 0);
-    }, 0);
+    const calcEngagement = (pList: any[]) => pList.reduce((sum, p) => sum + (p.metrics?.views || 0) + (p.metrics?.saves || 0) + (p.metrics?.comments || 0), 0);
 
-    // Calculate engagement % change
-    let engagementChange = 0;
+    const engagementLast7 = calcEngagement(last7Posts);
+    const engagementPrevious7 = calcEngagement(previous7Posts);
+
     let engagementTrend: 'up' | 'down' | 'neutral' = 'neutral';
-
+    let engagementChange = 0;
     if (engagementPrevious7 > 0) {
         engagementChange = ((engagementLast7 - engagementPrevious7) / engagementPrevious7) * 100;
         engagementTrend = engagementChange > 0 ? 'up' : engagementChange < 0 ? 'down' : 'neutral';
     } else if (engagementLast7 > 0) {
-        engagementChange = 100; // First posts, 100% increase
+        engagementChange = 100;
         engagementTrend = 'up';
     }
 
-    // Get top 10 posts by views (we'll limit to 5 in UI but allow 10 on click)
+    // Top Posts
     const topPosts = [...posts]
         .sort((a, b) => (b.metrics?.views || 0) - (a.metrics?.views || 0))
         .slice(0, 10);
 
-    // Total stats (all posts)
     const totalLikes = posts.reduce((sum, p) => sum + (p.metrics?.likes || 0), 0);
     const totalSaves = posts.reduce((sum, p) => sum + (p.metrics?.saves || 0), 0);
 
-    // Followers Trend Logic - FETCH FOR ACTIVE PROFILE
-    const currentFollowers = (await prisma.profile.findUnique({
-        where: { id: activeProfileId },
-        select: { followersCount: true }
-    }))?.followersCount || 0;
+    // --- History & Snapshots ---
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    // Get previous snapshot (e.g., from > 1 day ago to see daily growth, or just the last distinct one)
-    // For simplicity, let's get the most recent snapshot BEFORE the current value if feasible, or just the last one created.
-    // Actually, we want to see growth trend. Let's compare current with the previous snapshot.
-    const snapshots = await prisma.followerSnapshot.findMany({
-        where: { userId: session.user.id, profileId: activeProfileId },
-        orderBy: { createdAt: 'desc' },
-        take: 2 // Current (if snapshot created on update) and Previous
+    // 1. Ensure "Views" snapshot for today exists (Lazy Capture)
+    const totalViewsAllTime = posts.reduce((sum, p) => sum + (p.metrics?.views || 0), 0);
+
+    // We want "Views" history. 
+    // If we only store "Total Views" in snapshot, the graph will show cumulative growth.
+    // If we want "Daily Views", we need diffs. 
+    // User asked "Graphique qui évolue au fil du temps". Total views growing is a fine graph.
+    // Or daily views? Usually "Performance" implies daily activity.
+    // BUT capturing daily activity requires knowing what happened *today*.
+    // Using simple "Total Views" snapshot is easier and robust.
+
+    const existingViewSnap = await prisma.analyticsSnapshot.findFirst({
+        where: { profileId: activeProfileId, metric: 'views', date: today }
     });
 
+    if (existingViewSnap) {
+        // Update it (in case views increased since last load today)
+        if (existingViewSnap.value !== totalViewsAllTime) {
+            await prisma.analyticsSnapshot.update({ where: { id: existingViewSnap.id }, data: { value: totalViewsAllTime } });
+        }
+    } else {
+        await prisma.analyticsSnapshot.create({
+            data: { profileId: activeProfileId, metric: 'views', value: totalViewsAllTime, date: today }
+        });
+    }
+
+    // 2. Fetch History (Last 180 days / 6 months)
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 180);
+
+    const snapshots = await prisma.analyticsSnapshot.findMany({
+        where: {
+            profileId: activeProfileId,
+            date: { gte: thirtyDaysAgo }
+        },
+        orderBy: { date: 'asc' }
+    });
+
+    // Format for Recharts [{ date: 'DD/MM', value: 123 }]
+    const formatDate = (d: Date) => d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+
+    const viewsHistory = snapshots.filter(s => s.metric === 'views').map(s => ({
+        date: formatDate(s.date),
+        value: s.value,
+        originalDate: s.date
+    }));
+
+    const followersHistory = snapshots.filter(s => s.metric === 'followers').map(s => ({
+        date: formatDate(s.date),
+        value: s.value,
+        originalDate: s.date
+    }));
+
+    // Followers Current
+    const profile = await prisma.profile.findUnique({ where: { id: activeProfileId } });
+    const currentFollowers = profile?.followersCount || 0;
+
+    // Calc Followers Trend (vs yesterday or last snapshot)
     let followersTrend = 0;
     let followersTrendDirection: 'up' | 'down' | 'neutral' = 'neutral';
 
-    if (snapshots.length >= 2) {
-        const currentSnap = snapshots[0].count; // This should match currentFollowers if we just updated
-        const prevSnap = snapshots[1].count;
-
-        if (prevSnap > 0) {
-            followersTrend = ((currentSnap - prevSnap) / prevSnap) * 100;
+    // Get last 2 followers snapshots
+    const fSnaps = snapshots.filter(s => s.metric === 'followers');
+    if (fSnaps.length >= 2) {
+        const last = fSnaps[fSnaps.length - 1].value;
+        const prev = fSnaps[fSnaps.length - 2].value;
+        if (prev > 0) {
+            followersTrend = ((last - prev) / prev) * 100;
             followersTrendDirection = followersTrend > 0 ? 'up' : followersTrend < 0 ? 'down' : 'neutral';
-        } else if (currentSnap > 0) {
-            followersTrend = 100;
-            followersTrendDirection = 'up';
         }
     }
 
     return {
         posts,
         stats: {
-            views: viewsLast7,
+            views: viewsLast7, // Keep this for the card number if desired, OR use totalViewsAllTime? User said "Vues (7 derniers)" in screenshot. I'll stick to that for the number, but provide total for graph? 
+            // Actually user said: "je dois voir le chiffre et l'évolution...". 
+            // If graph is total views, number should probably match.
+            // But "Vues (7 derniers)" is specific. 
+            // I'll return both. totalViews for graph, viewsLast7 for text if needed.
+            totalViews: totalViewsAllTime,
             likes: totalLikes,
             saves: totalSaves,
             engagement: Math.round(engagementChange),
@@ -176,6 +301,10 @@ export async function getDashboardStats() {
             followersTrendDirection
         },
         topPosts,
+        history: {
+            views: viewsHistory,
+            followers: followersHistory
+        }
     };
 }
 
@@ -243,7 +372,7 @@ export async function getPostDetails(postId: string) {
             slides = [];
         }
 
-        const imageIds = slides.map((s: any) => s.imageId).filter(Boolean);
+        const imageIds = slides.map((s: any) => s.imageId || s.image_id).filter(Boolean);
 
         // Fetch images to get URLs
         const images = await prisma.image.findMany({
@@ -256,7 +385,7 @@ export async function getPostDetails(postId: string) {
         // Enrich slides with URLs
         const resolvedSlides = slides.map((slide: any) => ({
             ...slide,
-            imageUrl: imageMap.get(slide.imageId) || null
+            imageUrl: imageMap.get(slide.imageId || slide.image_id) || slide.imageUrl || slide.image_url || null
         }));
 
         // Convert Dates to strings to avoid serialization issues if any
@@ -282,7 +411,7 @@ export async function getPostDetails(postId: string) {
     }
 }
 
-export async function updatePost(postId: string, data: { title?: string; description?: string; slides?: any[] }) {
+export async function updatePost(postId: string, data: { title?: string; description?: string; date?: string; slides?: any[]; metrics?: { views: number; likes: number; saves: number; comments: number } }) {
     const session = await auth();
     if (!session?.user?.id) return { error: 'Unauthorized' };
 
@@ -290,16 +419,33 @@ export async function updatePost(postId: string, data: { title?: string; descrip
         const updateData: any = {};
         if (data.title !== undefined) updateData.title = data.title;
         if (data.description !== undefined) updateData.description = data.description;
+        if (data.date !== undefined) updateData.createdAt = new Date(data.date);
         if (data.slides !== undefined) {
-            // Ensure we only store the necessary fields for slides, stripping any transient UI properties if necessary like 'imageUrl'
-            // The schema expected is { imageId, imageHumanId, description, text }
-            const sanitizedSlides = data.slides.map(s => ({
-                imageId: s.imageId,
-                imageHumanId: s.imageHumanId,
-                description: s.description,
-                text: s.text
-            }));
+            // Update to support new CreationView Slide structure while maintaining backward compatibility where possible
+            // We want to persist: slide_number, text, intention, image_id (or imageId)
+            const sanitizedSlides = data.slides.map(s => {
+                return {
+                    slide_number: s.slide_number,
+                    text: s.text,
+                    intention: s.intention,
+                    image_id: s.image_id || s.imageId, // Standardize on image_id? Or keep both? Let's keep data as passed mostly but ensure image ID is saved
+                    imageId: s.imageId || s.image_id, // Keep redundant for now if other systems use it, or clean up later.
+                    description: s.description || s.intention, // Map intention to description if missing
+                    imageHumanId: s.imageHumanId
+                };
+            });
             updateData.slides = JSON.stringify(sanitizedSlides);
+        }
+
+        if (data.metrics) {
+            updateData.metrics = {
+                update: {
+                    views: data.metrics.views,
+                    likes: data.metrics.likes,
+                    comments: data.metrics.comments,
+                    saves: data.metrics.saves
+                }
+            };
         }
 
         await prisma.post.update({

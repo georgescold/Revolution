@@ -1,15 +1,21 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { PROMPTS } from './prompts';
 
-const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-});
+// Removed unused default anthropic instance
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-4-5-20251101';
 
-export async function analyzeImage(imageBase64: string, mediaType: string = "image/jpeg") {
+export async function analyzeImage(imageBase64: string, mediaType: string = "image/jpeg", apiKey: string) {
+    if (!apiKey) {
+        throw new Error("API Key is required for image analysis via Claude.");
+    }
+
     try {
-        const msg = await anthropic.messages.create({
+        const client = new Anthropic({
+            apiKey: apiKey,
+        });
+
+        const msg = await client.messages.create({
             model: MODEL,
             max_tokens: 1024,
             system: PROMPTS.IMAGE_ANALYSIS_SYSTEM,
@@ -42,7 +48,7 @@ export async function analyzeImage(imageBase64: string, mediaType: string = "ima
         return JSON.parse(cleanJson);
     } catch (error) {
         console.error("Claude Analysis Error:", error);
-        throw new Error("Failed to analyze image with Claude");
+        throw error; // Rethrow to allow upstream handling (e.g. invalid user key)
     }
 }
 

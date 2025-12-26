@@ -17,13 +17,21 @@ import { AnalyticsView } from '@/components/analytics/analytics-view';
 import { CollectionsView } from '@/components/collections/collections-view';
 import { CreationView } from '@/components/creation/creation-view';
 import { DashboardTabs } from '@/components/dashboard/dashboard-tabs';
+import { LogoutItem } from '@/components/dashboard/logout-item';
+import { ApiKeySettings } from '@/components/dashboard/api-key-settings';
 
 async function SignOutButton() {
     'use server';
-    await signOut();
+    await signOut({ redirectTo: '/login' });
 }
 
-export default async function DashboardPage() {
+// Next.js 15+ Page Props are Promises
+interface PageProps {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+export default async function DashboardPage(props: PageProps) {
+    const searchParams = await props.searchParams;
     const session = await auth();
     if (!session?.user?.id) redirect("/login");
 
@@ -53,14 +61,9 @@ export default async function DashboardPage() {
                         </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                        <form action={SignOutButton} className="w-full">
-                            <button type="submit" className="flex w-full items-center text-red-500 hover:text-red-700">
-                                <LogOut className="mr-2 h-4 w-4" />
-                                <span className="w-full text-left">Déconnexion</span>
-                            </button>
-                        </form>
-                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuSeparator />
+                    <LogoutItem logoutAction={SignOutButton} />
                 </DropdownMenuContent>
             </DropdownMenu>
         </>
@@ -71,6 +74,7 @@ export default async function DashboardPage() {
             analyticsContent={<AnalyticsView />}
             collectionsContent={<CollectionsView />}
             creationContent={<CreationView />}
+            apiKeyContent={<ApiKeySettings />}
             userNav={UserNav}
         />
     );

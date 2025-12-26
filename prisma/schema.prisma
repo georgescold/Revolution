@@ -15,6 +15,7 @@ model User {
   password      String?
   emailVerified DateTime?
   image         String?
+  anthropicApiKey String? // [NEW] User provided API Key
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   
@@ -24,6 +25,7 @@ model User {
   
   // Legacy/Global relations (still kept for data integrity or global admin)
   images        Image[]
+  collections   Collection[] // [NEW]
   
   // To be deprecated or linked via Profile in logic
   posts         Post[]
@@ -38,7 +40,10 @@ model Profile {
   tiktokName  String?
   bio         String?
   persona     String?  @db.Text
-  contentGoal String?  @db.Text
+
+  targetAudience String? @db.Text // [NEW] Target audience / "Persona"
+  leadMagnet  String?  @db.Text // [NEW] Lead Magnet
+  hashtags    String?  @db.Text // [NEW] Default hashtags
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   avatarUrl   String?
@@ -47,6 +52,7 @@ model Profile {
   // Relations
   posts       Post[]
   followerSnapshots FollowerSnapshot[]
+  analyticsSnapshots AnalyticsSnapshot[] // [NEW] Back-relation
 }
 
 model FollowerSnapshot {
@@ -73,7 +79,19 @@ model Image {
   mood            String?
   style           String?
   colors          String?  // JSON string
+  filename        String?  // [NEW] Original filename
+  collections     Collection[] // [NEW] Many-to-Many
   createdAt       DateTime @default(now())
+}
+
+model Collection {
+  id        String   @id @default(cuid())
+  name      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  images    Image[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Post {
@@ -114,4 +132,9 @@ model AnalyticsSnapshot {
   date      DateTime @default(now())
   metric    String
   value     Float
+  
+  profileId String?
+  profile   Profile? @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, date, metric]) // Logical uniqueness for daily snapshots (requires truncation in code)
 }

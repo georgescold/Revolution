@@ -6,8 +6,14 @@ import { Upload, X, Loader2 } from 'lucide-react';
 import { uploadImage } from '@/server/actions/image-actions';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
+import imageCompression from 'browser-image-compression';
 
-export function ImageUploader() {
+interface ImageUploaderProps {
+    onUploadSuccess?: () => void;
+    collectionId?: string;
+}
+
+export function ImageUploader({ onUploadSuccess, collectionId }: ImageUploaderProps) {
     const [isUploading, startTransition] = useTransition();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [progress, setProgress] = useState(0);
@@ -32,7 +38,32 @@ export function ImageUploader() {
         // Helper to process a batch
         const processBatch = async (batchFiles: File[]) => {
             const formData = new FormData();
-            batchFiles.forEach(f => formData.append('file', f));
+
+            // Compress/Convert all files in parallel
+            const compressedFiles = await Promise.all(batchFiles.map(async (file) => {
+                try {
+                    const options = {
+                        maxSizeMB: 4.8, // Close to 5MB limit but safe
+                        maxWidthOrHeight: 4096, // High resolution support (4K)
+                        useWebWorker: true,
+                        fileType: "image/jpeg", // Force JPEG for compatibility
+                        initialQuality: 0.95 // Very high quality
+                    };
+                    const compressedFile = await imageCompression(file, options);
+                    // Create a new file with the original name (but .jpg extension if changed)
+                    const newName = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+                    return new File([compressedFile], newName, { type: "image/jpeg" });
+                } catch (error) {
+                    console.error("Compression failed for", file.name, error);
+                    return file; // Fallback to original if compression fails
+                }
+            }));
+
+            compressedFiles.forEach(f => formData.append('file', f));
+
+            if (collectionId) {
+                formData.append('collectionId', collectionId);
+            }
 
             const result = await uploadImage(formData);
             if (result.success && result.count) {

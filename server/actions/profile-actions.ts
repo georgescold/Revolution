@@ -6,12 +6,15 @@ import { auth } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 import fs from 'fs/promises';
 import path from 'path';
+import { addProfileToApify, removeProfileFromApify, runTikTokScraper } from '@/lib/apify';
 
 const ProfileSchema = z.object({
     tiktokName: z.string().min(1, "Le nom TikTok est requis"),
     tiktokBio: z.string().optional(),
     persona: z.string().optional(),
-    contentGoal: z.string().optional(),
+    targetAudience: z.string().optional(),
+    leadMagnet: z.string().optional(),
+    hashtags: z.string().optional(),
 });
 
 // Helper to get active profile
@@ -51,7 +54,7 @@ export async function createProfile(formData: z.infer<typeof ProfileSchema>) {
     const session = await auth();
     if (!session?.user?.id) return { error: 'Not authenticated' };
 
-    const { tiktokName, tiktokBio, persona, contentGoal } = formData;
+    const { tiktokName, tiktokBio, persona, targetAudience, leadMagnet, hashtags } = formData;
 
     try {
         const profile = await prisma.profile.create({
@@ -60,7 +63,9 @@ export async function createProfile(formData: z.infer<typeof ProfileSchema>) {
                 tiktokName,
                 bio: tiktokBio,
                 persona,
-                contentGoal,
+                targetAudience,
+                leadMagnet,
+                hashtags,
             },
         });
 
@@ -72,6 +77,15 @@ export async function createProfile(formData: z.infer<typeof ProfileSchema>) {
         });
 
         revalidatePath('/dashboard');
+
+        // Sync with Apify
+        if (tiktokName) {
+            // Fire and forget catch, scrape ONLY this new profile immediately
+            addProfileToApify(tiktokName)
+                .then(() => runTikTokScraper([tiktokName], false))
+                .catch(e => console.error("Apify sync (create) failed:", e));
+        }
+
         return { success: true, profileId: profile.id };
     } catch (error) {
         return { error: 'Failed to create profile' };
@@ -106,8 +120,11 @@ export async function updateProfile(formData: FormData) {
     const tiktokName = formData.get('tiktokName') as string;
     const tiktokBio = formData.get('tiktokBio') as string;
     const persona = formData.get('persona') as string;
-    const contentGoal = formData.get('contentGoal') as string;
-    const followersCount = parseInt(formData.get('followersCount') as string) || 0;
+    const targetAudience = formData.get('targetAudience') as string;
+    const leadMagnet = formData.get('leadMagnet') as string;
+    const hashtags = formData.get('hashtags') as string;
+    const followersCountRaw = formData.get('followersCount');
+    const followersCount = followersCountRaw ? parseInt(followersCountRaw as string) : undefined;
     const avatarFile = formData.get('avatar') as File | null;
 
     try {
@@ -134,14 +151,16 @@ export async function updateProfile(formData: FormData) {
                 tiktokName,
                 bio: tiktokBio,
                 persona,
-                contentGoal,
-                followersCount,
+                targetAudience,
+                leadMagnet,
+                hashtags,
+                ...(followersCount !== undefined ? { followersCount } : {}),
                 ...(avatarUrl ? { avatarUrl } : {}),
             },
         });
 
         // Snapshot if changed or new
-        if (currentProfile.followersCount !== followersCount) {
+        if (followersCount !== undefined && currentProfile.followersCount !== followersCount) {
             await prisma.followerSnapshot.create({
                 data: {
                     userId: session.user.id,
@@ -152,9 +171,38 @@ export async function updateProfile(formData: FormData) {
         }
 
         revalidatePath('/dashboard');
+
+        // Sync with Apify if name changed
+        if (currentProfile.tiktokName !== tiktokName) {
+            const syncPromises = [];
+
+            if (currentProfile.tiktokName) {
+                syncPromises.push(removeProfileFromApify(currentProfile.tiktokName));
+            }
+
+            // Assuming tiktokName is always a string from formData (or empty string)
+            if (tiktokName) {
+                syncPromises.push(
+                    addProfileToApify(tiktokName).then(() => runTikTokScraper([tiktokName], false))
+                );
+            }
+
+            Promise.all(syncPromises).catch(e => console.error("Apify sync (update) failed:", e));
+        }
+        // If just other fields changed but name is same, maybe we don't need to re-run?
+        // But user said "envoie automatiquement le profil à scraper".
+        // Assuming "update profile" button click implies "scrape me now".
+        // If name didn't change, we can still trigger a scrape? 
+        // Let's stick to name change for list sync, but maybe trigger scrape anyway?
+        // User request: "lorsqu'un utilisateur rentre un profil donc son Nom tiktok ... que ça envoie".
+        // This implies setting the name is the trigger.
+        // If I just update bio, I don't necessarily want to scrape.
+        // I will stick to the name change logic for now.
+
         return { success: true };
-    } catch (error) {
-        return { error: 'Failed to update profile' };
+    } catch (error: any) {
+        console.error('Failed to update profile:', error);
+        return { error: `Failed to update profile: ${error.message}` };
     }
 }
 
@@ -166,6 +214,12 @@ export async function deleteProfile() {
     if (!activeProfileId) return { error: 'No active profile to delete' };
 
     try {
+        // Fetch profile to get name for Apify sync before deleting
+        const profileToDelete = await prisma.profile.findUnique({
+            where: { id: activeProfileId },
+            select: { tiktokName: true }
+        });
+
         // Count profiles to prevent deleting the last one (optional, but safer)
         const profileCount = await prisma.profile.count({
             where: { userId: session.user.id }
@@ -198,6 +252,12 @@ export async function deleteProfile() {
         }
 
         revalidatePath('/dashboard');
+
+        // Sync with Apify
+        if (profileToDelete?.tiktokName) {
+            removeProfileFromApify(profileToDelete.tiktokName).catch(e => console.error("Apify sync (delete) failed:", e));
+        }
+
         return { success: true };
     } catch (e) {
         return { error: 'Failed to delete profile' };

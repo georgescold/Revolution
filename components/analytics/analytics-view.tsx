@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { getDashboardStats } from '@/server/actions/analytics-actions';
+import { getDashboardStats, updateFollowers } from '@/server/actions/analytics-actions';
 import { AddPostDialog } from './add-post-dialog';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Trophy } from 'lucide-react';
@@ -7,64 +7,71 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { PostsTable } from './posts-table';
 import { PostDetailsModal } from './post-details-modal';
 import { TopPostsCard } from './top-posts-card';
+import { MetricHistoryCard } from './metric-history-card';
+
+import { SyncButton } from './sync-button';
 
 export async function AnalyticsView() {
-    const data = await getDashboardStats();
+    const stats = await getDashboardStats();
 
-    if (!data) return <div>Loading...</div>;
+    if (!stats) return <div>Loading...</div>;
 
-    const { posts, stats, topPosts } = data;
+    const { posts, topPosts } = stats;
+    const today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold tracking-tight">Performance</h2>
-                <AddPostDialog />
+                <div className="space-y-1">
+                    <h2 className="text-2xl font-bold tracking-tight">Performance</h2>
+                    <p className="text-sm text-muted-foreground capitalize">{today}</p>
+                </div>
+                <div className="flex gap-2">
+                    <SyncButton />
+                    <AddPostDialog />
+                </div>
             </div>
 
             {/* Stats Cards */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card className="bg-card/50 backdrop-blur">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Vues (7 derniers)</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{stats.views.toLocaleString()}</div>
-                    </CardContent>
-                </Card>
+                {/* Views Card with Graph */}
+                <MetricHistoryCard
+                    title="Vues"
+                    value={stats.stats.totalViews}
+                    subValue="(Total)"
+                    trend={stats.stats.views > 0 ? Math.round((stats.stats.views / stats.stats.totalViews) * 100) : 0} // Approximated 'trend' as % of total or just show +N this week? User asked for graph. 
+                    // Let's use the actual history for the graph.
+                    // For the "trend" text, the design asked for evolution.
+                    // The `stats.stats.engagementTrend` logic was standard. 
+                    // I will use specific logic for views.
+                    trendDirection="up" // Always up for total views
+                    data={stats.history.views}
+                    chartColor="#ec4899" // Pink for views? Or primary.
+                    rangeOptions={[
+                        { key: '7d', label: '7J' },
+                        { key: '30d', label: '30J' },
+                        { key: '6m', label: '6M' }
+                    ]}
+                />
 
-                <Card className="bg-card/50 backdrop-blur">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Engagement & Abonnés</CardTitle>
-                        {/* Overall Trend Icon based on both metrics? Or just engagement */}
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex justify-between items-end">
-                            <div>
-                                <p className="text-xs text-muted-foreground">Engagement</p>
-                                <div className={`text-2xl font-bold ${stats.engagementTrend === 'up' ? 'text-green-600' : stats.engagementTrend === 'down' ? 'text-red-600' : ''}`}>
-                                    {stats.engagement > 0 ? '+' : ''}{stats.engagement}%
-                                </div>
-                            </div>
-                            {stats.engagementTrend === 'up' && <TrendingUp className="h-4 w-4 text-green-600 mb-2" />}
-                            {stats.engagementTrend === 'down' && <TrendingDown className="h-4 w-4 text-red-600 mb-2" />}
-                        </div>
+                {/* Followers Card with Graph & Edit */}
+                <MetricHistoryCard
+                    title="Abonnés"
+                    value={stats.stats.followers}
+                    trend={Math.abs(stats.stats.followersTrend)}
+                    trendDirection={stats.stats.followersTrendDirection as 'up' | 'down' | 'neutral'}
+                    data={stats.history.followers}
+                    editable={true}
+                    onSave={updateFollowers}
+                    chartColor="#10b981" // Green
+                    rangeOptions={[
+                        { key: '30d', label: '1M' },
+                        { key: '6m', label: '6M' },
+                        { key: '1y', label: '1A' }
+                    ]}
+                />
 
-                        <div className="border-t border-border/50 pt-3 flex justify-between items-end">
-                            <div>
-                                <p className="text-xs text-muted-foreground">Abonnés ({stats.followers.toLocaleString()})</p>
-                                <div className={`text-xl font-bold ${stats.followersTrendDirection === 'up' ? 'text-green-600' : stats.followersTrendDirection === 'down' ? 'text-red-600' : ''}`}>
-                                    {stats.followersTrendDirection === 'up' ? '+' : ''}{stats.followersTrend}%
-                                </div>
-                            </div>
-                            {stats.followersTrendDirection === 'up' && <TrendingUp className="h-4 w-4 text-green-600 mb-1" />}
-                            {stats.followersTrendDirection === 'down' && <TrendingDown className="h-4 w-4 text-red-600 mb-1" />}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <TopPostsCard topPosts={topPosts} />
-
+                {/* Posts Analyzed */}
                 <Card className="bg-card/50 backdrop-blur">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Posts Analysés</CardTitle>
@@ -73,10 +80,14 @@ export async function AnalyticsView() {
                         <div className="text-2xl font-bold">{posts.length}</div>
                     </CardContent>
                 </Card>
+
+                <TopPostsCard topPosts={topPosts} />
             </div>
 
             {/* Posts Table */}
-            <PostsTable posts={posts} />
+            <div className="overflow-x-auto">
+                <PostsTable posts={posts} />
+            </div>
         </div>
     );
 }

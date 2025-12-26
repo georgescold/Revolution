@@ -47,9 +47,11 @@ export default async function ProfilePage() {
                         tiktokName: profile.tiktokName || "",
                         tiktokBio: profile.bio || "",
                         persona: profile.persona || "",
-                        contentGoal: profile.contentGoal || "",
+                        targetAudience: (profile as any).targetAudience || "",
+                        leadMagnet: (profile as any).leadMagnet || "",
                         avatarUrl: profile.avatarUrl || undefined,
-                        followersCount: profile.followersCount || 0
+                        followersCount: profile.followersCount || 0,
+                        hashtags: profile.hashtags || ""
                     }}
                 />
             </div>

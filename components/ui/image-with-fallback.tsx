@@ -21,12 +21,16 @@ export function ImageWithFallback({ src, fallbackSrc, alt, className, ...props }
             // Let's assume the passed `src` was local.
 
             const isAlreadyRemote = imgSrc.includes('onrender.com');
+            const isApiRoute = imgSrc.includes('/api/uploads/');
 
-            if (!isAlreadyRemote) {
-                // Try switching to render url
+            if (!isApiRoute && src.startsWith('/uploads/')) {
+                // Try switching to API route which reads directly from disk
+                setImgSrc(`/api${src}`);
+            } else if (!isAlreadyRemote && !isApiRoute) {
+                // Try switching to render url (last resort)
                 setImgSrc(`https://revolution-m2wr.onrender.com${src}`);
             } else {
-                // Already tried remote, give up
+                // Already tried everything
                 setHasError(true);
             }
         }

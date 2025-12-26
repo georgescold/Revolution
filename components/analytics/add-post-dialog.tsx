@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addPost } from '@/server/actions/analytics-actions';
 import { getUserImages } from '@/server/actions/image-actions';
@@ -21,6 +22,9 @@ export function AddPostDialog() {
 
     // Step 1 data
     const [platform, setPlatform] = useState<'tiktok' | 'instagram'>('tiktok');
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]); // Default to today
     const [slides, setSlides] = useState<SlideData[]>([
         { imageId: '', imageHumanId: '', description: '', text: '' }
     ]);
@@ -81,6 +85,9 @@ export function AddPostDialog() {
         startTransition(async () => {
             const data = {
                 platform,
+                title,
+                description,
+                date,
                 slides,
                 views: Number(views),
                 likes: Number(likes),
@@ -97,6 +104,9 @@ export function AddPostDialog() {
                 // Reset form
                 setStep(1);
                 setPlatform('tiktok');
+                setTitle('');
+                setDescription('');
+                setDate(new Date().toISOString().split('T')[0]); // Reset to today
                 setSlides([{ imageId: '', imageHumanId: '', description: '', text: '' }]);
                 setViews('0');
                 setLikes('0');
@@ -143,15 +153,32 @@ export function AddPostDialog() {
                             <Input
                                 id="title"
                                 placeholder="Ex: Mon meilleur carrousel sur..."
-                                value={slides[0]?.text || ''}
-                                onChange={(e) => {
-                                    const newSlides = [...slides];
-                                    if (newSlides[0]) {
-                                        newSlides[0].text = e.target.value;
-                                        setSlides(newSlides);
-                                    }
-                                }}
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
                                 className="font-medium"
+                            />
+                        </div>
+
+                        {/* Description Field */}
+                        <div className="space-y-2">
+                            <Label htmlFor="description">Description (Optionnel)</Label>
+                            <Textarea
+                                id="description"
+                                placeholder="Ajouter une description..."
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                rows={2}
+                            />
+                        </div>
+
+                        {/* Date Field */}
+                        <div className="space-y-2">
+                            <Label htmlFor="date">Date de création</Label>
+                            <Input
+                                id="date"
+                                type="date"
+                                value={date}
+                                onChange={(e) => setDate(e.target.value)}
                             />
                         </div>
 

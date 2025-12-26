@@ -17,6 +17,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ForceSignOut } from "@/components/auth/force-signout";
+import { RocketIcon } from '@/components/ui/rocket-icon';
 
 const montserrat = Montserrat({ subsets: ["latin"], weight: ["400", "700", "900"] });
 
@@ -34,7 +36,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
         include: { profiles: true }
     });
 
-    const activeProfileId = user?.activeProfileId || user?.profiles[0]?.id || null;
+    if (!user) {
+        return <ForceSignOut />;
+    }
+
     const profiles = user?.profiles || [];
 
     // Mobile-optimized Header with Space Theme
@@ -69,22 +74,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </div>
 
             <Link href="/dashboard" className="relative z-10 flex items-center space-x-3 md:space-x-4 group">
-                {/* Mini Rocket */}
-                <div className="relative w-8 h-8 md:w-10 md:h-10 animate-[rocket-hover_3s_ease-in-out_infinite] group-hover:scale-110 transition-transform duration-300">
-                    <svg width="100%" height="100%" viewBox="0 0 200 200" fill="none" className="drop-shadow-lg">
-                        <path d="M100 160 Q110 180 100 200 Q90 180 100 160" fill="#FFD700" className="animate-[exhaust-flame_0.1s_infinite] group-hover:animate-[exhaust-flame_0.04s_infinite]" />
-                        <path d="M100 160 Q105 175 100 190 Q95 175 100 160" fill="#FFA500" className="animate-[exhaust-flame_0.1s_infinite] delay-75 group-hover:animate-[exhaust-flame_0.04s_infinite]" />
-                        <path d="M70 140 L60 160 L90 150 Z" fill="#D32F2F" stroke="#222" strokeWidth="6" strokeLinejoin="round" />
-                        <path d="M130 140 L140 160 L110 150 Z" fill="#D32F2F" stroke="#222" strokeWidth="6" strokeLinejoin="round" />
-                        <ellipse cx="100" cy="100" rx="35" ry="60" fill="white" stroke="#222" strokeWidth="6" />
-                        <path d="M72 70 Q100 10 128 70" fill="#F44336" stroke="#222" strokeWidth="6" />
-                        <path d="M72 70 Q100 80 128 70" fill="#F44336" />
-                        <circle cx="100" cy="100" r="16" fill="#2196F3" stroke="#222" strokeWidth="6" />
-                        <circle cx="100" cy="100" r="10" fill="#64B5F6" />
-                        <circle cx="104" cy="96" r="3" fill="white" opacity="0.8" />
-                        <path d="M85 145 Q100 155 115 145 L115 150 Q100 160 85 150 Z" fill="#2196F3" stroke="#222" strokeWidth="4" />
-                    </svg>
-                </div>
+                {/* Mini Rocket - Now using the unified animated icon */}
+                <RocketIcon className="w-12 h-12 md:w-16 md:h-16 group-hover:scale-105 transition-transform duration-300" />
 
                 {/* Glitch Logo */}
                 <div className="relative">
@@ -95,7 +86,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             </Link>
 
             {/* Icons moved to DashboardTabs in page.tsx */}
-        </header>
+        </header >
     );
 
     if (profiles.length === 0) {
