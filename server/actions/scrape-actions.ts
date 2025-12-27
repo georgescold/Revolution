@@ -167,12 +167,23 @@ export async function scrapeAndSyncTikTokData() {
             }
         }
 
-        await prisma.analyticsSnapshot.create({
-            data: {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        await prisma.analyticsSnapshot.upsert({
+            where: {
+                profileId_date_metric: {
+                    profileId: profile.id,
+                    date: today,
+                    metric: "followers"
+                }
+            },
+            update: { value: profile.followersCount || 0 },
+            create: {
                 profileId: profile.id,
                 metric: "followers",
-                value: profile.followersCount || 0, // [UPDATED] Use manual DB value, not scraped value
-                date: new Date()
+                value: profile.followersCount || 0,
+                date: today
             }
         });
 

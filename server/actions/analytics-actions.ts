@@ -107,45 +107,25 @@ export async function updateFollowers(count: number) {
         // const tomorrow = new Date(today); // Already declared
         // tomorrow.setDate(tomorrow.getDate() + 1); // Already set
 
-        // Find ALL snapshots for today to clean up duplicates
-        const todaysSnapshots = await prisma.analyticsSnapshot.findMany({
+        // Upsert for Today (Midnight)
+
+
+        await prisma.analyticsSnapshot.upsert({
             where: {
-                profileId: activeProfileId,
-                metric: 'followers',
-                date: {
-                    gte: today,
-                    lt: tomorrow
+                profileId_date_metric: {
+                    profileId: activeProfileId,
+                    date: today,
+                    metric: 'followers'
                 }
             },
-            orderBy: { date: 'desc' } // Latest first
-        });
-
-        if (todaysSnapshots.length > 0) {
-            // Update the most recent one
-            const latest = todaysSnapshots[0];
-            await prisma.analyticsSnapshot.update({
-                where: { id: latest.id },
-                data: { value: count }
-            });
-
-            // Delete duplicates if any exist (cleanup old bad data)
-            if (todaysSnapshots.length > 1) {
-                const idsToDelete = todaysSnapshots.slice(1).map(s => s.id);
-                await prisma.analyticsSnapshot.deleteMany({
-                    where: { id: { in: idsToDelete } }
-                });
+            update: { value: count },
+            create: {
+                profileId: activeProfileId,
+                metric: 'followers',
+                value: count,
+                date: today
             }
-        } else {
-            // Create new if none exists
-            await prisma.analyticsSnapshot.create({
-                data: {
-                    profileId: activeProfileId,
-                    metric: 'followers',
-                    value: count,
-                    date: new Date() // Use exact time for precision
-                }
-            });
-        }
+        });
 
         revalidatePath('/dashboard');
         return { success: true };
@@ -226,20 +206,23 @@ export async function getDashboardStats() {
     // BUT capturing daily activity requires knowing what happened *today*.
     // Using simple "Total Views" snapshot is easier and robust.
 
-    const existingViewSnap = await prisma.analyticsSnapshot.findFirst({
-        where: { profileId: activeProfileId, metric: 'views', date: today }
-    });
-
-    if (existingViewSnap) {
-        // Update it (in case views increased since last load today)
-        if (existingViewSnap.value !== totalViewsAllTime) {
-            await prisma.analyticsSnapshot.update({ where: { id: existingViewSnap.id }, data: { value: totalViewsAllTime } });
+    // Upsert View Snapshot ensuring no race conditions
+    await prisma.analyticsSnapshot.upsert({
+        where: {
+            profileId_date_metric: {
+                profileId: activeProfileId,
+                metric: 'views',
+                date: today
+            }
+        },
+        update: { value: totalViewsAllTime }, // Always keep up to date with total
+        create: {
+            profileId: activeProfileId,
+            metric: 'views',
+            value: totalViewsAllTime,
+            date: today
         }
-    } else {
-        await prisma.analyticsSnapshot.create({
-            data: { profileId: activeProfileId, metric: 'views', value: totalViewsAllTime, date: today }
-        });
-    }
+    });
 
     // 2. Fetch History (Last 180 days / 6 months)
     const thirtyDaysAgo = new Date(today);
