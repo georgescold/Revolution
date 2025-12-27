@@ -50,7 +50,7 @@ async function main() {
 
     // 3. Find the conflicting TikTok Video (from Dec 21st, matching the date)
     // We assume it's the one with "Commente guide"
-    const relevantItems = items.filter(i => {
+    const relevantItems = items.filter((i: any) => {
         if (!i.createTime) return false;
         const vidDate = new Date(i.createTime * 1000);
         // Check roughly same day (Dec 21 approx)
@@ -59,7 +59,7 @@ async function main() {
 
     console.log(`\nFound ${relevantItems.length} TikTok videos from same day (approx):`);
 
-    for (const item of relevantItems) {
+    for (const item of (relevantItems as any[])) {
         console.log(`\n--- Comparison with Video ID ${item.id} ---`);
         console.log(`Video Text: "${item.text}"`);
         console.log(`Video Date: ${new Date(item.createTime! * 1000).toISOString()}`);
