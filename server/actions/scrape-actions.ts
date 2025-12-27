@@ -25,7 +25,7 @@ interface TikTokProfile {
 }
 
 export async function scrapeAndSyncTikTokData() {
-    console.log("Starting TikTok sync process (Strict Hybrid: Date OR Strict Text)...");
+
 
     try {
         // [STEP 0] Cleanup scraped-only posts
@@ -77,7 +77,7 @@ export async function scrapeAndSyncTikTokData() {
             }
         });
 
-        console.log(`Found ${candidatePosts.length} candidate posts in DB.`);
+
 
         for (const item of items) {
             const scrapedText = (item.text || "").toLowerCase();

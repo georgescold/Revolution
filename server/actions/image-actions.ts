@@ -87,7 +87,7 @@ export async function uploadImage(formData: FormData) {
                 .from(BUCKET_NAME)
                 .getPublicUrl(filename);
 
-            console.log(`[Upload] Uploaded to ${publicUrl}`);
+
 
             // 2. DB Prep
             const timestamp = Date.now().toString().slice(-6);

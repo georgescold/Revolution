@@ -57,7 +57,8 @@ export async function generateHooks() {
     const profile = await prisma.profile.findUnique({ where: { id: activeProfileId } });
 
     // [AI CLIENT SETUP]
-    const { client: anthropic } = await getAnthropicClient(session.user.id);
+    // [AI CLIENT SETUP] - Moved to try/catch
+
 
     // [DEEP LEARNING ENGINE]
     // 1. Fetch extensive history to identify patterns
@@ -144,6 +145,9 @@ export async function generateHooks() {
     `;
 
     try {
+        // [AI CLIENT SETUP]
+        const { client: anthropic } = await getAnthropicClient(session.user.id);
+
         const msg = await anthropic.messages.create({
             model: MODEL,
             max_tokens: 1024,
@@ -167,7 +171,9 @@ export async function generateHooks() {
         return { hooks };
     } catch (e: any) {
         console.error("Hook Generation Error:", e);
-        return { error: `Erreur: ${e.message || 'Génération échouée'}` };
+        // Clean error message for user
+        const message = e.message.includes("Clé API") ? e.message : "Erreur lors de la génération. Vérifiez votre clé API.";
+        return { error: message };
     }
 }
 
@@ -207,7 +213,13 @@ export async function generateReplacementHook(rejectedHook: HookProposal) {
     const activeProfileId = await getActiveProfileId(session.user.id);
     if (!activeProfileId) return { error: 'No active profile found' };
 
-    const { client } = await getAnthropicClient(session.user.id);
+    let client;
+    try {
+        const res = await getAnthropicClient(session.user.id);
+        client = res.client;
+    } catch (e: any) {
+        return { error: e.message };
+    }
 
     // Generate a single replacement
     const systemPrompt = `
@@ -247,11 +259,17 @@ export async function generateReplacementHook(rejectedHook: HookProposal) {
     }
 }
 
-export async function generateCarousel(hook: string) {
+export async function generateCarousel(hook: string, collectionId?: string) {
     const session = await auth();
     if (!session?.user?.id) return { error: 'Unauthorized' };
 
-    const { client } = await getAnthropicClient(session.user.id);
+    let client;
+    try {
+        const res = await getAnthropicClient(session.user.id);
+        client = res.client;
+    } catch (e: any) {
+        return { error: e.message };
+    }
 
     // 1. Generate Slides Content AND Description
     let slides: Slide[] = [];
@@ -378,13 +396,14 @@ export async function generateCarousel(hook: string) {
     const images = await prisma.image.findMany({
         where: {
             userId: session.user.id,
-            id: { notIn: Array.from(usedImageIds) }
+            id: { notIn: Array.from(usedImageIds) },
+            ...(collectionId && collectionId !== 'all' ? { collections: { some: { id: collectionId } } } : {})
         },
         select: { id: true, humanId: true, descriptionLong: true, keywords: true, storageUrl: true }
     });
 
     if (images.length === 0) {
-        return { slides, description, warning: "Pas assez d'images disponibles (filtre anti-répétition activé)." };
+        return { slides, description, warning: "Pas assez d'images disponibles dans cette collection (ou filtre anti-répétition activé)." };
     }
 
     // 3. Match Images (Claude)

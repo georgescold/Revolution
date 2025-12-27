@@ -9,7 +9,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { getUserCollections, addImageToCollection } from '@/server/actions/collection-actions';
+import { getUserCollections, addImagesToCollection } from '@/server/actions/collection-actions';
 import { toast } from 'sonner';
 import { FolderPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -18,10 +18,10 @@ import { useRouter } from 'next/navigation';
 interface AddToCollectionDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    imageId: string;
+    imageIds: string[];
 }
 
-export function AddToCollectionDialog({ open, onOpenChange, imageId }: AddToCollectionDialogProps) {
+export function AddToCollectionDialog({ open, onOpenChange, imageIds }: AddToCollectionDialogProps) {
     const [collections, setCollections] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const router = useRouter();
@@ -38,10 +38,10 @@ export function AddToCollectionDialog({ open, onOpenChange, imageId }: AddToColl
 
     const handleAdd = async (collectionId: string) => {
         setLoading(true);
-        const result = await addImageToCollection(collectionId, imageId);
+        const result = await addImagesToCollection(collectionId, imageIds);
         setLoading(false);
         if (result.success) {
-            toast.success("Image ajoutée à la collection");
+            toast.success("Image(s) ajoutée(s) à la collection");
             onOpenChange(false);
             router.refresh();
         } else {

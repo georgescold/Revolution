@@ -5,9 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { useState, useTransition } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, Loader2, AlertCircle, CheckCircle2, X, FolderPlus } from 'lucide-react';
+import { Trash2, Loader2, AlertCircle, CheckCircle2, X, FolderPlus, MinusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { deleteImage, deleteImages } from '@/server/actions/image-actions';
+import { removeImageFromCollection, removeImagesFromCollection } from '@/server/actions/collection-actions';
 import { toast } from 'sonner';
 import { ImageWithFallback } from '@/components/ui/image-with-fallback';
 import { cn } from '@/lib/utils';
@@ -36,9 +37,10 @@ type ClientImage = {
     style?: string | null;
 };
 
-export function ImageGrid({ images }: { images: ClientImage[] }) {
+export function ImageGrid({ images, collectionId }: { images: ClientImage[], collectionId?: string }) {
     const [selectedImage, setSelectedImage] = useState<ClientImage | null>(null);
     const [imageToAdd, setImageToAdd] = useState<string | null>(null);
+    const [isBatchAddOpen, setIsBatchAddOpen] = useState(false);
     const [isPending, startTransition] = useTransition();
 
     // Bulk Selection State
@@ -64,55 +66,89 @@ export function ImageGrid({ images }: { images: ClientImage[] }) {
     };
 
     const handleBulkDelete = async () => {
-        if (!confirm(`Supprimer ${selectedIds.size} images ?`)) return;
-
-        startTransition(async () => {
-            const result = await deleteImages(Array.from(selectedIds));
-            if (result.success) {
-                toast.success(`${selectedIds.size} images supprimées`);
-                setSelectedIds(new Set());
-                setIsSelectionMode(false);
-            } else {
-                toast.error('Erreur lors de la suppression de groupe');
-            }
-        });
+        if (collectionId) {
+            if (!confirm(`Retirer ${selectedIds.size} images de la collection ? (Elles resteront dans la galerie générale)`)) return;
+            startTransition(async () => {
+                const result = await removeImagesFromCollection(collectionId, Array.from(selectedIds));
+                if (result.success) {
+                    toast.success(`${selectedIds.size} images retirées`);
+                    setSelectedIds(new Set());
+                    setIsSelectionMode(false);
+                } else {
+                    toast.error('Erreur lors du retrait');
+                }
+            });
+        } else {
+            if (!confirm(`Supprimer DÉFINITIVEMENT ${selectedIds.size} images ?`)) return;
+            startTransition(async () => {
+                const result = await deleteImages(Array.from(selectedIds));
+                if (result.success) {
+                    toast.success(`${selectedIds.size} images supprimées`);
+                    setSelectedIds(new Set());
+                    setIsSelectionMode(false);
+                } else {
+                    toast.error('Erreur lors de la suppression');
+                }
+            });
+        }
     };
 
     const handleDelete = async (e: React.MouseEvent, img: ClientImage) => {
         e.stopPropagation();
-        if (!confirm('Êtes-vous sûr de vouloir supprimer cette image ?')) return;
 
-        startTransition(async () => {
-            const result = await deleteImage(img.id, img.storageUrl);
-            if (result.success) {
-                toast.success('Image supprimée');
-                if (selectedImage?.id === img.id) setSelectedImage(null);
-            } else {
-                toast.error('Erreur lors de la suppression');
-            }
-        });
+        if (collectionId) {
+            if (!confirm('Retirer cette image de la collection ?')) return;
+            startTransition(async () => {
+                const result = await removeImageFromCollection(collectionId, img.id);
+                if (result.success) {
+                    toast.success('Image retirée');
+                    if (selectedImage?.id === img.id) setSelectedImage(null);
+                } else {
+                    toast.error('Erreur lors du retrait');
+                }
+            });
+        } else {
+            if (!confirm('Êtes-vous sûr de vouloir supprimer cette image DÉFINITIVEMENT ?')) return;
+            startTransition(async () => {
+                const result = await deleteImage(img.id, img.storageUrl);
+                if (result.success) {
+                    toast.success('Image supprimée');
+                    if (selectedImage?.id === img.id) setSelectedImage(null);
+                } else {
+                    toast.error('Erreur lors de la suppression');
+                }
+            });
+        }
     };
 
     return (
         <>
             {/* Toolbar */}
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                 <Button
                     variant={isSelectionMode ? "secondary" : "outline"}
                     onClick={() => {
                         setIsSelectionMode(!isSelectionMode);
                         setSelectedIds(new Set());
                     }}
-                    className="gap-2"
+                    className="gap-2 w-full sm:w-auto"
                 >
                     {isSelectionMode ? <X className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
                     {isSelectionMode ? 'Annuler' : 'Gérer / Supprimer'}
                 </Button>
 
                 {isSelectionMode && (
-                    <div className="flex gap-2 animate-in fade-in slide-in-from-right-4">
+                    <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-right-4 w-full sm:w-auto">
                         <Button variant="outline" onClick={handleSelectAll}>
                             {selectedIds.size === images.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            disabled={selectedIds.size === 0 || isPending}
+                            onClick={() => setIsBatchAddOpen(true)}
+                        >
+                            <FolderPlus className="w-4 h-4 mr-2" />
+                            Ajouter ({selectedIds.size})
                         </Button>
                         <Button
                             variant="destructive"
@@ -120,7 +156,17 @@ export function ImageGrid({ images }: { images: ClientImage[] }) {
                             onClick={handleBulkDelete}
                         >
                             {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                            Supprimer ({selectedIds.size})
+                            {collectionId ? (
+                                <>
+                                    <MinusCircle className="w-4 h-4 mr-2" />
+                                    Retirer ({selectedIds.size})
+                                </>
+                            ) : (
+                                <>
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Supprimer ({selectedIds.size})
+                                </>
+                            )}
                         </Button>
                     </div>
                 )}
@@ -186,9 +232,11 @@ export function ImageGrid({ images }: { images: ClientImage[] }) {
                                             className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
                                             onClick={(e) => handleDelete(e, img)}
                                             disabled={isPending}
-                                            title="Supprimer"
+                                            title={collectionId ? "Retirer de la collection" : "Supprimer"}
                                         >
-                                            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> :
+                                                (collectionId ? <MinusCircle className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />)
+                                            }
                                         </Button>
                                     </div>
                                     <p className="text-xs text-white font-mono mb-1">{img.humanId}</p>
@@ -205,18 +253,31 @@ export function ImageGrid({ images }: { images: ClientImage[] }) {
             </div>
 
             <AddToCollectionDialog
-                open={!!imageToAdd}
-                onOpenChange={(open) => !open && setImageToAdd(null)}
-                imageId={imageToAdd || ""}
+                open={!!imageToAdd || isBatchAddOpen}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setImageToAdd(null);
+                        setIsBatchAddOpen(false);
+                        if (isBatchAddOpen) setIsSelectionMode(false); // Close selection mode after batch add? Optional. User might want to do more. Let's keep it open.
+                        // Actually, closing selection mode usually makes sense after action. But let's verify user preference. Usually yes.
+                        // Let's reset selection if batch add successful? The dialog handles success toast.
+                        // Ideally we pass a callback, but for now standard close.
+                        if (isBatchAddOpen) {
+                            setSelectedIds(new Set());
+                            setIsSelectionMode(false);
+                        }
+                    }
+                }}
+                imageIds={imageToAdd ? [imageToAdd] : Array.from(selectedIds)}
             />
 
             <Dialog open={!!selectedImage} onOpenChange={(open) => !open && setSelectedImage(null)}>
-                <DialogContent className="max-w-2xl bg-card border-2 border-border">
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-card border-2 border-border">
                     <DialogHeader>
                         <DialogTitle>{selectedImage?.humanId}</DialogTitle>
                     </DialogHeader>
-                    <div className="grid grid-cols-2 gap-6">
-                        <div className="aspect-square rounded-md overflow-hidden bg-muted flex items-center justify-center">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="aspect-square rounded-md overflow-hidden bg-muted flex items-center justify-center relative">
                             {selectedImage && (
                                 <ImageWithFallback
                                     src={selectedImage.storageUrl}
@@ -225,7 +286,7 @@ export function ImageGrid({ images }: { images: ClientImage[] }) {
                                 />
                             )}
                         </div>
-                        <ScrollArea className="h-[400px]">
+                        <ScrollArea className="h-auto md:h-[400px]">
                             <div className="space-y-4 pr-4">
                                 <div>
                                     <h4 className="font-semibold text-sm mb-1 text-primary">Description</h4>

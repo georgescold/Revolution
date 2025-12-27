@@ -163,7 +163,11 @@ export async function getDashboardStats() {
     if (!activeProfileId) return { posts: [], stats: { views: 0, totalViews: 0, likes: 0, saves: 0, engagement: 0, engagementTrend: 'neutral', followers: 0, followersTrend: 0, followersTrendDirection: 'neutral' }, topPosts: [], history: { views: [], followers: [] } };
 
     const posts = await prisma.post.findMany({
-        where: { userId: session.user.id, profileId: activeProfileId },
+        where: {
+            userId: session.user.id,
+            profileId: activeProfileId,
+            status: { notIn: ['draft', 'idea'] }
+        },
         include: { metrics: true },
         orderBy: { createdAt: 'desc' }
     });
@@ -314,7 +318,11 @@ export async function getInsights() {
     if (!session?.user?.id) return null;
 
     const posts = await prisma.post.findMany({
-        where: { userId: session.user.id, NOT: { metrics: null } },
+        where: {
+            userId: session.user.id,
+            NOT: { metrics: null },
+            status: { notIn: ['draft', 'idea'] }
+        },
         include: { metrics: true }
     });
 

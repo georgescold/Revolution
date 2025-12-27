@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Download, LayoutGrid } from "lucide-react";
 import Link from "next/link";
 import { CollectionsSidebar } from "./collections-sidebar";
+import { CollectionHeaderActions } from "./collection-header-actions";
 
 interface CollectionsViewProps {
     collectionId?: string;
@@ -42,21 +43,17 @@ export async function CollectionsView({ collectionId }: CollectionsViewProps) {
                                 : "Toutes les images partagées par la communauté."}
                         </p>
                     </div>
-                    <div className="flex gap-2">
-                        <Button variant="outline" asChild>
-                            <Link href="/api/backup/collections" target="_blank">
-                                <Download className="mr-2 h-4 w-4" />
-                                Tout télécharger
-                            </Link>
-                        </Button>
-                    </div>
+                    <CollectionHeaderActions
+                        collectionId={collectionId}
+                        currentImageIds={images.map((img: any) => img.id)}
+                    />
                 </div>
 
                 {/* Only show Uploader if we are NOT in a specific collection, OR if we pass the ID to it */}
                 {/* Actually user requested: "Une nouvelle image ajoutée à sa propre collection..." so we pass appropriate ID */}
                 <ImageUploader collectionId={collectionId} />
 
-                <ImageGrid images={images as any} />
+                <ImageGrid images={images as any} collectionId={collectionId} />
             </div>
         </div>
     )

@@ -72,7 +72,7 @@ export default async function DashboardPage(props: PageProps) {
     return (
         <DashboardTabs
             analyticsContent={<AnalyticsView />}
-            collectionsContent={<CollectionsView />}
+            collectionsContent={<CollectionsView collectionId={searchParams.collection as string} />}
             creationContent={<CreationView />}
             apiKeyContent={<ApiKeySettings />}
             userNav={UserNav}

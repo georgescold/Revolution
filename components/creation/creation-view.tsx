@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { generateHooks, generateCarousel, saveCarousel, getDrafts, updatePostContent, saveHookAsIdea, getSavedIdeas, deletePost, rejectHook, generateReplacementHook, HookProposal, Slide } from '@/server/actions/creation-actions';
 import { retryFailedAnalyses, getUserImages } from '@/server/actions/image-actions';
+import { getUserCollections } from '@/server/actions/collection-actions';
 import { toast } from 'sonner';
 import { Loader2, Sparkles, Check, RefreshCw, FileText, Clock, ArrowRight, Bookmark, Lightbulb, User, Trash, Image as ImageIcon, X, Target } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-
 
 interface CreationViewProps {
     initialPost?: {
@@ -31,6 +31,9 @@ export function CreationView({ initialPost }: CreationViewProps) {
     const [description, setDescription] = useState("");
     const [drafts, setDrafts] = useState<any[]>([]);
     const [savedIdeas, setSavedIdeas] = useState<any[]>([]);
+    const [collections, setCollections] = useState<any[]>([]); // [NEW]
+    const [selectedCollectionId, setSelectedCollectionId] = useState<string>(''); // [NEW] Forced choice
+
     const [isPending, startTransition] = useTransition();
     const [replacingIndex, setReplacingIndex] = useState<number | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -41,36 +44,24 @@ export function CreationView({ initialPost }: CreationViewProps) {
     const [userImages, setUserImages] = useState<any[]>([]);
     const [isLoadingImages, setIsLoadingImages] = useState(false);
 
-    useEffect(() => {
-        if (initialPost) {
-            try {
-                // ... (rest of initialPost logic)
-                const parsedSlides = JSON.parse(initialPost.slides ?? '[]');
-                setSlides(parsedSlides);
-                // ... (rest)
-                setDescription((initialPost as any).description || "");
-
-                setSelectedHook({
-                    id: 'edit',
-                    angle: 'Edit',
-                    hook: initialPost.hookText,
-                    reason: 'Editing existing post'
-                });
-                setEditingId(initialPost.id);
-                setStep('preview');
-            } catch (e) {
-                toast.error("Erreur au chargement du post");
-            }
-        } else if (step === 'hooks') {
-            loadDrafts();
-        }
-    }, [initialPost, step]);
-
     const loadDrafts = async () => {
-        const [draftsRes, ideasRes] = await Promise.all([getDrafts(), getSavedIdeas()]);
+        const [draftsRes, ideasRes, collectionsRes] = await Promise.all([getDrafts(), getSavedIdeas(), getUserCollections()]);
         if (draftsRes.success && draftsRes.drafts) setDrafts(draftsRes.drafts);
         if (ideasRes.success && ideasRes.ideas) setSavedIdeas(ideasRes.ideas);
+        if (collectionsRes.success && collectionsRes.collections) setCollections(collectionsRes.collections);
     };
+
+    useEffect(() => {
+        loadDrafts();
+    }, []);
+
+    useEffect(() => {
+        if (step === 'config') {
+            getUserCollections().then(res => {
+                if (res.success && res.collections) setCollections(res.collections);
+            });
+        }
+    }, [step]);
 
     const handleOpenImagePicker = async (index: number) => {
         setPickingSlideIndex(index);
@@ -90,13 +81,10 @@ export function CreationView({ initialPost }: CreationViewProps) {
     const handleSelectImage = (image: any) => {
         if (pickingSlideIndex !== null) {
             const newSlides = [...slides];
-            // Update the specific slide
-            // Note: image.storageUrl might be relative or absolute depending on how it's stored
-            // getUserImages returns `storageUrl` which is typically `/uploads/...` or `/api/uploads/...`
             newSlides[pickingSlideIndex] = {
                 ...newSlides[pickingSlideIndex],
                 image_id: image.id,
-                image_url: image.storageUrl // This should be displayable
+                image_url: image.storageUrl
             };
             setSlides(newSlides);
             setIsImagePickerOpen(false);
@@ -110,7 +98,7 @@ export function CreationView({ initialPost }: CreationViewProps) {
             if (result.error) toast.error(result.error);
             else if (result.hooks) {
                 setHooks(result.hooks);
-                setEditingId(null); // Clear editing ID when starting new
+                setEditingId(null);
             }
         });
     };
@@ -118,10 +106,7 @@ export function CreationView({ initialPost }: CreationViewProps) {
     const handleRejectHook = (index: number, hook: HookProposal) => {
         setReplacingIndex(index);
         startTransition(async () => {
-            // 1. Reject
             await rejectHook(hook);
-
-            // 2. Replace
             const res = await generateReplacementHook(hook);
             if (res.hook) {
                 const newHooks = [...hooks];
@@ -146,7 +131,6 @@ export function CreationView({ initialPost }: CreationViewProps) {
 
     const handleDeleteSlide = (index: number) => {
         const newSlides = slides.filter((_, i) => i !== index);
-        // Re-index slides
         const reindexed = newSlides.map((s, i) => ({ ...s, slide_number: i + 1 }));
         setSlides(reindexed);
     };
@@ -159,12 +143,18 @@ export function CreationView({ initialPost }: CreationViewProps) {
 
     const handleGenerateCarousel = () => {
         if (!selectedHook) return;
+        if (!selectedCollectionId) {
+            toast.error("Veuillez sélectionner une collection d'images pour continuer");
+            return;
+        }
         startTransition(async () => {
-            const result = await generateCarousel(selectedHook.hook);
+            // [NEW] Pass selectedCollectionId
+            const result = await generateCarousel(selectedHook.hook, selectedCollectionId);
             if (result.error) toast.error(result.error);
             else if (result.slides) {
                 setSlides(result.slides);
-                setDescription(result.description || ""); // [NEW] Set description
+                setDescription(result.description || "");
+                if (result.warning) toast.warning(result.warning); // Show warning if sent
                 setStep('preview');
             }
         });
@@ -284,7 +274,7 @@ export function CreationView({ initialPost }: CreationViewProps) {
     // Step 1: Hooks
     if (step === 'hooks') {
         return (
-            <div className="space-y-10 max-w-4xl mx-auto py-8">
+            <div className="space-y-10 max-w-4xl mx-auto py-8 px-4">
                 {/* Hero Section */}
                 <div className="relative">
                     <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-secondary/10 rounded-3xl blur-xl" />
@@ -325,24 +315,7 @@ export function CreationView({ initialPost }: CreationViewProps) {
                                     L'IA va analyser les tendances et te proposer des angles viraux
                                 </p>
                             </div>
-                            <div className="flex justify-center mt-4">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={async () => {
-                                        toast.info("Relance de l'analyse des images...");
-                                        const res = await retryFailedAnalyses();
-                                        if (res.success) {
-                                            toast.success(`${res.count} images analysées avec succès !`);
-                                        } else {
-                                            toast.error(res.error || "Erreur inconnue");
-                                        }
-                                    }}
-                                    className="text-xs text-muted-foreground hover:text-primary"
-                                >
-                                    <RefreshCw className="w-3 h-3 mr-2" /> Réparer les images non analysées
-                                </Button>
-                            </div>
+
                         </CardContent>
                     </Card>
                 </div>
@@ -415,48 +388,106 @@ export function CreationView({ initialPost }: CreationViewProps) {
                     )
                 }
 
-                {/* Drafts Section */}
-                {
-                    drafts.length > 0 && hooks.length === 0 && (
-                        <div className="space-y-4">
-                            <h3 className="text-xl font-bold flex items-center gap-2">
-                                <FileText className="w-5 h-5" /> Reprendre un brouillon
-                            </h3>
-                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {drafts.map((draft) => (
-                                    <Card key={draft.id} className="cursor-pointer hover:bg-muted/50 transition-colors group relative" onClick={() => resumeDraft(draft)}>
-                                        <CardHeader className="pb-2 relative">
-                                            <CardTitle className="text-base line-clamp-2 pr-8">{draft.hookText}</CardTitle>
-                                            <CardDescription className="flex items-center gap-2 text-xs">
-                                                <Clock className="w-3 h-3" />
-                                                {new Date(draft.createdAt).toLocaleDateString()}
-                                            </CardDescription>
+                {/* Saved Content Section - Drafts & Ideas */}
+                {(drafts.length > 0 || savedIdeas.length > 0) ? (
+                    <div className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200 border-t border-border/50 pt-8 mt-8">
+
+                        {/* 1. Drafts */}
+                        {drafts.length > 0 && (
+                            <div className="space-y-6">
+                                <h3 className="text-xl font-bold flex items-center gap-2 text-primary">
+                                    <FileText className="w-5 h-5" /> Reprendre un brouillon
+                                </h3>
+                                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {drafts.map((draft) => (
+                                        <Card key={draft.id} className="cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-all group relative border-l-4 border-l-transparent hover:border-l-primary" onClick={() => resumeDraft(draft)}>
+                                            <CardHeader className="pb-2 relative">
+                                                <CardTitle className="text-base line-clamp-2 pr-8 leading-snug">{draft.hookText}</CardTitle>
+                                                <CardDescription className="flex items-center gap-2 text-xs pt-1">
+                                                    <Clock className="w-3 h-3" />
+                                                    {new Date(draft.createdAt).toLocaleDateString()}
+                                                </CardDescription>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="absolute top-2 right-2 h-7 w-7 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (confirm("Supprimer ce brouillon ?")) {
+                                                            handleDeleteDraft(draft.id);
+                                                        }
+                                                    }}
+                                                    title="Supprimer le brouillon"
+                                                >
+                                                    <Trash className="w-4 h-4" />
+                                                </Button>
+                                            </CardHeader>
+                                            <CardFooter className="pt-2">
+                                                <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground group-hover:text-primary transition-colors text-xs">
+                                                    Continuer l'édition <ArrowRight className="w-3 h-3 ml-2 group-hover:translate-x-1 transition-transform" />
+                                                </Button>
+                                            </CardFooter>
+                                        </Card>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 2. Saved Ideas */}
+                        {savedIdeas.length > 0 && (
+                            <div className="space-y-6">
+                                <h3 className="text-xl font-bold flex items-center gap-2 text-yellow-500">
+                                    <Lightbulb className="w-5 h-5" /> Idées & Hooks Sauvegardés
+                                </h3>
+                                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {savedIdeas.map((idea) => (
+                                        <Card key={idea.id} className="cursor-pointer hover:border-yellow-500/50 hover:bg-yellow-500/5 transition-all group relative border-l-4 border-l-transparent hover:border-l-yellow-500"
+                                            onClick={() => {
+                                                setSelectedHook({
+                                                    id: idea.id,
+                                                    hook: idea.hookText,
+                                                    angle: idea.title || 'Saved Idea',
+                                                    reason: idea.description || 'Saved Idea'
+                                                });
+                                                setStep('config');
+                                            }}
+                                        >
+                                            <CardHeader className="pb-2 relative">
+                                                <div className="absolute top-3 right-3">
+                                                    <Bookmark className="w-4 h-4 text-yellow-500 fill-current" />
+                                                </div>
+                                                <div className="text-xs font-mono text-yellow-600 mb-1 uppercase tracking-wide">{idea.title}</div>
+                                                <CardTitle className="text-base line-clamp-3 leading-snug">"{idea.hookText}"</CardTitle>
+                                            </CardHeader>
+                                            <CardFooter className="pt-2 pb-4">
+                                                <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground group-hover:text-yellow-600 transition-colors text-xs">
+                                                    Générer ce post <ArrowRight className="w-3 h-3 ml-2 group-hover:translate-x-1 transition-transform" />
+                                                </Button>
+                                            </CardFooter>
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                className="absolute top-2 right-2 h-6 w-6 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                                className="absolute bottom-2 right-2 h-7 w-7 text-muted-foreground/30 hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    if (confirm("Supprimer ce brouillon ?")) {
-                                                        handleDeleteDraft(draft.id);
+                                                    if (confirm("Supprimer cette idée ?")) {
+                                                        handleDeleteDraft(idea.id);
                                                     }
                                                 }}
-                                                title="Supprimer le brouillon"
                                             >
-                                                <Trash className="w-4 h-4" />
+                                                <Trash className="w-3 h-3" />
                                             </Button>
-                                        </CardHeader>
-                                        <CardFooter className="pt-2">
-                                            <Button variant="ghost" size="sm" className="w-full justify-between group-hover:text-primary transition-colors">
-                                                Continuer <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                                            </Button>
-                                        </CardFooter>
-                                    </Card>
-                                ))}
+                                        </Card>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    )
-                }
+                        )}
+                    </div>
+                ) : (
+                    <div className="text-center py-8 opacity-40">
+                        <p className="text-sm">Aucun brouillon ni idée sauvegardée.</p>
+                    </div>
+                )}
             </div >
         );
     }
@@ -479,6 +510,28 @@ export function CreationView({ initialPost }: CreationViewProps) {
                                 Je vais analyser la complexité de ce sujet pour déterminer le nombre de slides parfait (6 à 8) afin de maximiser la rétention.
                             </p>
                         </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                            Source des images
+                        </label>
+                        <select
+                            value={selectedCollectionId}
+                            onChange={(e) => setSelectedCollectionId(e.target.value)}
+                            className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <option value="" disabled>-- Choisir une collection --</option>
+                            <option value="all">Toutes mes images</option>
+                            {collections.map(c => (
+                                <option key={c.id} value={c.id}>
+                                    {c.name} ({c._count?.images || 0} images)
+                                </option>
+                            ))}
+                        </select>
+                        <p className="text-xs text-muted-foreground">
+                            Choisissez la collection dans laquelle l'IA doit piocher les images.
+                        </p>
                     </div>
 
                     <Button size="lg" className="w-full" onClick={handleGenerateCarousel} disabled={isPending}>

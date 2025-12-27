@@ -119,3 +119,66 @@ export async function deleteCollection(collectionId: string) {
         return { error: 'Failed to delete collection' };
     }
 }
+
+export async function addImagesToCollection(collectionId: string, imageIds: string[]) {
+    const session = await auth();
+    if (!session?.user?.id) return { error: 'Unauthorized' };
+
+    try {
+        const collection = await prisma.collection.findUnique({
+            where: { id: collectionId }
+        });
+        if (!collection || collection.userId !== session.user.id) {
+            return { error: 'Access denied' };
+        }
+
+        // Connect all images
+        const connectQuery = imageIds.map(id => ({ id }));
+
+        await prisma.collection.update({
+            where: { id: collectionId },
+            data: {
+                images: {
+                    connect: connectQuery
+                }
+            }
+        });
+
+        revalidatePath('/dashboard');
+        return { success: true };
+    } catch (e) {
+        console.error("Batch add to collection error:", e);
+        return { error: 'Failed to add images' };
+    }
+}
+
+export async function removeImagesFromCollection(collectionId: string, imageIds: string[]) {
+    const session = await auth();
+    if (!session?.user?.id) return { error: 'Unauthorized' };
+
+    try {
+        const collection = await prisma.collection.findUnique({
+            where: { id: collectionId }
+        });
+        if (!collection || collection.userId !== session.user.id) {
+            return { error: 'Access denied' };
+        }
+
+        const disconnectQuery = imageIds.map(id => ({ id }));
+
+        await prisma.collection.update({
+            where: { id: collectionId },
+            data: {
+                images: {
+                    disconnect: disconnectQuery
+                }
+            }
+        });
+
+        revalidatePath('/dashboard');
+        return { success: true };
+    } catch (e) {
+        console.error("Batch remove from collection error:", e);
+        return { error: 'Failed to remove images' };
+    }
+}

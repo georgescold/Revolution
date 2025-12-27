@@ -75,7 +75,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
             <Link href="/dashboard" className="relative z-10 flex items-center space-x-3 md:space-x-4 group">
                 {/* Mini Rocket - Now using the unified animated icon */}
-                <RocketIcon className="w-12 h-12 md:w-16 md:h-16 group-hover:scale-105 transition-transform duration-300" />
+                {/* "Violent" Fire (isLaunching=true) but NO Smoke (showSmoke=false) as requested */}
+                <RocketIcon
+                    isLaunching={true}
+                    showSmoke={false}
+                    className="w-16 h-16 md:w-20 md:h-20 mt-4 group-hover:scale-105 transition-transform duration-300"
+                />
 
                 {/* Glitch Logo */}
                 <div className="relative">
